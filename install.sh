@@ -26,7 +26,7 @@ parse_users_arg() {
     local u
 
     if [[ -z "${raw}" ]]; then
-        err "Missing users list. Example: $0 users shayan,anothername"
+        err "Missing users list. Example: $0 users name1,anothername"
         exit 1
     fi
 
@@ -296,10 +296,10 @@ Usage: $0 {users|ssh|recaptcha|udgpw|bbr|all} [port] [users_list]
   all        - Execute all steps in the correct order (requires users list)
 
 Example:
-  $0 users shayan,anothername
+  $0 users name1,anothername
   $0 ssh 2233
-  $0 all 2233 shayan,anothername
-  $0 all shayan,anothername
+  $0 all 2233 name1,anothername
+  $0 all name1,anothername
 EOF
 }
 
