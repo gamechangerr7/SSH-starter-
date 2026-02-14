@@ -26,7 +26,7 @@ parse_users_arg() {
     local u
 
     if [[ -z "${raw}" ]]; then
-        err "Missing users list. Example: $0 users name1,anothername"
+        err "Missing users list. Example: $0 users shayan,anothername"
         exit 1
     fi
 
@@ -81,12 +81,18 @@ run_with_sudo() {
 # ------------------------------------------------------------
 add_users() {
     info "Adding system users..."
+    local home_dir=""
     for u in "${USERS[@]}"; do
         if id "$u" &>/dev/null; then
             echo "  $u : already exists"
         else
             run_with_sudo useradd -m -s /bin/bash "$u"
             echo "$u:$u" | run_with_sudo chpasswd
+            home_dir="/home/$u"
+            if [[ "$home_dir" == /home/* && -d "$home_dir" ]]; then
+                run_with_sudo rm -rf -- "$home_dir"
+                echo "  $u : removed home directory '$home_dir'"
+            fi
             echo "  $u : user added with password '$u'"
         fi
     done
@@ -296,10 +302,10 @@ Usage: $0 {users|ssh|recaptcha|udgpw|bbr|all} [port] [users_list]
   all        - Execute all steps in the correct order (requires users list)
 
 Example:
-  $0 users name1,anothername
+  $0 users shayan,anothername
   $0 ssh 2233
-  $0 all 2233 name1,anothername
-  $0 all name1,anothername
+  $0 all 2233 shayan,anothername
+  $0 all shayan,anothername
 EOF
 }
 
