@@ -10,6 +10,8 @@ SSH_PORT=2233
 CIPHERS="aes128-gcm@openssh.com,aes128-ctr"
 UDPGW_PORT=7305
 STEP_DELAY=1
+DETECTED_SSH_PORT_SOURCE=""
+DETECTED_IRAN_IP_SOURCE=""
 
 # ------------------------------------------------------------
 # HELPER FUNCTIONS
@@ -19,6 +21,21 @@ warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
 err()  { echo -e "\033[1;31m[ERROR]\033[0m $1" >&2; }
 success() { echo -e "\033[1;32m[✔]\033[0m $1"; }
 fail() { echo -e "\033[1;31m[✘]\033[0m $1"; }
+
+show_sshtunnel_banner() {
+    echo -e "\033[1;35m"
+    cat <<'EOF'
+==========================================================
+   _____  ____  _    _   _______ _   _ _   _ ______ _     
+  / ___ _/ __ \| |  | | |__   __| \ | | \ | |  ____| |    
+ | (___ | |  | | |  | |    | |  |  \| |  \| | |__  | |    
+  \___  \ |  | | |  | |    | |  | . ` | . ` |  __| | |    
+  ____) | |__| | |__| |    | |  | |\  | |\  | |____| |____
+ |_____/ \____/ \____/     |_|  |_| \_|_| \_|______|______|
+==========================================================
+EOF
+    echo -e "\033[0m"
+}
 
 parse_users_arg() {
     local raw="$1"
@@ -85,7 +102,7 @@ prompt_with_default() {
     local label="$1"
     local default="$2"
     local value=""
-    read -r -p "$(printf '\033[1;36m%s\033[0m [%s]: ' "$label" "$default")" value
+    read -r -p "$(printf '\033[1;36m%s\033[0m [%s] (Enter=use default): ' "$label" "$default")" value
     echo "${value:-$default}"
 }
 
@@ -110,19 +127,28 @@ prompt_yes_no() {
 
 detect_current_ssh_port() {
     local detected=""
+    local source="fallback"
 
     if command -v sshd &>/dev/null; then
         detected="$(run_with_sudo sshd -T 2>/dev/null | awk '/^port / {print $2; exit}' || true)"
+        if is_valid_port "${detected:-}"; then
+            source="sshd -T"
+        fi
     fi
 
     if ! is_valid_port "${detected:-}"; then
         detected="$(run_with_sudo awk '/^[[:space:]]*Port[[:space:]]+[0-9]+/ {print $2; exit}' /etc/ssh/sshd_config 2>/dev/null || true)"
+        if is_valid_port "${detected:-}"; then
+            source="/etc/ssh/sshd_config"
+        fi
     fi
 
     if ! is_valid_port "${detected:-}"; then
         detected="22"
+        source="fallback"
     fi
 
+    DETECTED_SSH_PORT_SOURCE="$source"
     echo "$detected"
 }
 
@@ -132,17 +158,20 @@ detect_public_ipv4() {
     if command -v curl &>/dev/null; then
         ip="$(curl -4fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
         if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP_SOURCE="api.ipify.org"
             echo "$ip"
             return 0
         fi
 
         ip="$(curl -4fsS --max-time 5 https://ifconfig.me 2>/dev/null || true)"
         if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP_SOURCE="ifconfig.me"
             echo "$ip"
             return 0
         fi
     fi
 
+    DETECTED_IRAN_IP_SOURCE="fallback"
     return 1
 }
 
@@ -170,6 +199,8 @@ resolve_ipv4() {
 ensure_root_cron_job() {
     local cron_line="$1"
     local current_cron=""
+    local header_1="# ==== SSH Tunnel Auto-Restore (managed by install.sh) ===="
+    local header_2="# Added by command: ./install.sh sshtunnel"
 
     current_cron="$(run_with_sudo crontab -l 2>/dev/null || true)"
     if grep -Fqx "$cron_line" <<<"$current_cron"; then
@@ -179,6 +210,13 @@ ensure_root_cron_job() {
 
     {
         [[ -n "$current_cron" ]] && printf '%s\n' "$current_cron"
+        if [[ -n "$current_cron" ]]; then
+            printf '\n'
+        fi
+        if ! grep -Fqx "$header_1" <<<"$current_cron"; then
+            printf '%s\n' "$header_1"
+            printf '%s\n' "$header_2"
+        fi
         printf '%s\n' "$cron_line"
     } | run_with_sudo crontab -
 
@@ -424,13 +462,13 @@ run_sshtunnel() {
     local eu_host=""
     local eu_ip=""
     local eu_port=""
-    local eu_user=""
     local ssh_client_ip=""
     local blacklist_host=""
     local blacklist_ip=""
     local reboot_script=""
     local cron_line=""
 
+    show_sshtunnel_banner
     info "Starting SSH tunnel DNAT setup..."
     warn "This command flushes current iptables rules before applying new tunnel rules."
 
@@ -439,6 +477,19 @@ run_sshtunnel() {
     if [[ -z "$detected_iran_ip" ]]; then
         detected_iran_ip="87.248.152.162"
     fi
+
+    if [[ "${DETECTED_SSH_PORT_SOURCE:-fallback}" == "fallback" ]]; then
+        info "Current SSH port not detected. Fallback is 22. Press Enter to use 22 or type another port."
+    else
+        info "Detected current SSH port: $detected_port (from ${DETECTED_SSH_PORT_SOURCE}). Press Enter to use it or type another port."
+    fi
+
+    if [[ "${DETECTED_IRAN_IP_SOURCE:-fallback}" == "fallback" ]]; then
+        info "Iran public IP not detected automatically. Fallback is 87.248.152.162. Press Enter to use it or type another IP/domain."
+    else
+        info "Detected Iran public IP: $detected_iran_ip (from ${DETECTED_IRAN_IP_SOURCE}). Press Enter to use it or type another IP/domain."
+    fi
+    info "This command only configures local iptables/sysctl on this server (no login to EU server)."
 
     while true; do
         iran_port="$(prompt_with_default "Iran SSH port (incoming port on this server)" "$detected_port")"
@@ -471,11 +522,6 @@ run_sshtunnel() {
         fi
         warn "Invalid port. Please enter a number between 1 and 65535."
     done
-
-    eu_user="$(prompt_with_default "EU SSH username (credential note)" "root")"
-    info "Using EU credentials hint: $eu_user"
-    info "Sudo/root credentials may be requested now."
-    run_with_sudo -v
 
     if prompt_yes_no "Add blacklist/bypass IP so that IP is never routed (recommended)?" "y"; then
         ssh_client_ip="${SSH_CLIENT:-${SSH_CONNECTION:-}}"
