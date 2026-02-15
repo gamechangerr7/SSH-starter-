@@ -76,6 +76,156 @@ run_with_sudo() {
     fi
 }
 
+is_valid_port() {
+    local port="$1"
+    [[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 ))
+}
+
+prompt_with_default() {
+    local label="$1"
+    local default="$2"
+    local value=""
+    read -r -p "$(printf '\033[1;36m%s\033[0m [%s]: ' "$label" "$default")" value
+    echo "${value:-$default}"
+}
+
+prompt_yes_no() {
+    local label="$1"
+    local default="${2:-n}"
+    local value=""
+    local suffix="[y/N]"
+
+    if [[ "${default,,}" == "y" ]]; then
+        suffix="[Y/n]"
+    fi
+
+    read -r -p "$(printf '\033[1;36m%s\033[0m %s: ' "$label" "$suffix")" value
+    value="${value,,}"
+    if [[ -z "$value" ]]; then
+        value="${default,,}"
+    fi
+
+    [[ "$value" == "y" || "$value" == "yes" ]]
+}
+
+detect_current_ssh_port() {
+    local detected=""
+
+    if command -v sshd &>/dev/null; then
+        detected="$(run_with_sudo sshd -T 2>/dev/null | awk '/^port / {print $2; exit}' || true)"
+    fi
+
+    if ! is_valid_port "${detected:-}"; then
+        detected="$(run_with_sudo awk '/^[[:space:]]*Port[[:space:]]+[0-9]+/ {print $2; exit}' /etc/ssh/sshd_config 2>/dev/null || true)"
+    fi
+
+    if ! is_valid_port "${detected:-}"; then
+        detected="22"
+    fi
+
+    echo "$detected"
+}
+
+detect_public_ipv4() {
+    local ip=""
+
+    if command -v curl &>/dev/null; then
+        ip="$(curl -4fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
+        if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            echo "$ip"
+            return 0
+        fi
+
+        ip="$(curl -4fsS --max-time 5 https://ifconfig.me 2>/dev/null || true)"
+        if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            echo "$ip"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+resolve_ipv4() {
+    local host="$1"
+    local ip=""
+
+    if [[ "$host" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        echo "$host"
+        return 0
+    fi
+
+    if command -v getent &>/dev/null; then
+        ip="$(getent ahostsv4 "$host" 2>/dev/null | awk 'NR==1 {print $1}' || true)"
+    fi
+
+    if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        echo "$ip"
+        return 0
+    fi
+
+    return 1
+}
+
+ensure_root_cron_job() {
+    local cron_line="$1"
+    local current_cron=""
+
+    current_cron="$(run_with_sudo crontab -l 2>/dev/null || true)"
+    if grep -Fqx "$cron_line" <<<"$current_cron"; then
+        info "Root crontab already contains reboot entry."
+        return 0
+    fi
+
+    {
+        [[ -n "$current_cron" ]] && printf '%s\n' "$current_cron"
+        printf '%s\n' "$cron_line"
+    } | run_with_sudo crontab -
+
+    success "Root crontab updated for reboot."
+}
+
+write_sshtunnel_reboot_script() {
+    local iran_ip="$1"
+    local iran_port="$2"
+    local eu_ip="$3"
+    local eu_port="$4"
+    local blacklist_ip="${5:-}"
+    local script_path="/usr/local/sbin/sshtunnel-restore.sh"
+    local blacklist_tcp_rule=""
+    local blacklist_udp_rule=""
+
+    if [[ -n "$blacklist_ip" ]]; then
+        blacklist_tcp_rule="\"\$IPTABLES_BIN\" -t nat -I PREROUTING 1 -p tcp -s $blacklist_ip -d $iran_ip --dport $iran_port -j ACCEPT"
+        blacklist_udp_rule="\"\$IPTABLES_BIN\" -t nat -I PREROUTING 1 -p udp -s $blacklist_ip -d $iran_ip --dport $iran_port -j ACCEPT"
+    fi
+
+    run_with_sudo tee "$script_path" >/dev/null <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+IPTABLES_BIN="\$(command -v iptables || echo /sbin/iptables)"
+SYSCTL_BIN="\$(command -v sysctl || echo /sbin/sysctl)"
+
+"\$SYSCTL_BIN" -w net.ipv4.ip_forward=1 >/dev/null
+"\$IPTABLES_BIN" -F
+"\$IPTABLES_BIN" -t nat -F
+"\$IPTABLES_BIN" -X
+${blacklist_tcp_rule}
+${blacklist_udp_rule}
+"\$IPTABLES_BIN" -t nat -A PREROUTING -p tcp -d $iran_ip --dport $iran_port -j DNAT --to-destination $eu_ip:$eu_port
+"\$IPTABLES_BIN" -t nat -A PREROUTING -p udp -d $iran_ip --dport $iran_port -j DNAT --to-destination $eu_ip:$eu_port
+"\$IPTABLES_BIN" -t nat -A POSTROUTING -p tcp -d $eu_ip --dport $eu_port -j MASQUERADE
+"\$IPTABLES_BIN" -t nat -A POSTROUTING -p udp -d $eu_ip --dport $eu_port -j MASQUERADE
+"\$IPTABLES_BIN" -A FORWARD -p tcp -d $eu_ip --dport $eu_port -j ACCEPT
+"\$IPTABLES_BIN" -A FORWARD -p udp -d $eu_ip --dport $eu_port -j ACCEPT
+"\$IPTABLES_BIN" -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+EOF
+
+    run_with_sudo chmod 700 "$script_path"
+    echo "$script_path"
+}
+
 # ------------------------------------------------------------
 # STEP 1: CREATE USERS
 # ------------------------------------------------------------
@@ -263,6 +413,136 @@ run_bbr() {
 }
 
 # ------------------------------------------------------------
+# STEP X: SSH TUNNEL DNAT (INTERACTIVE)
+# ------------------------------------------------------------
+run_sshtunnel() {
+    local detected_port=""
+    local detected_iran_ip=""
+    local iran_port=""
+    local iran_host=""
+    local iran_ip=""
+    local eu_host=""
+    local eu_ip=""
+    local eu_port=""
+    local eu_user=""
+    local ssh_client_ip=""
+    local blacklist_host=""
+    local blacklist_ip=""
+    local reboot_script=""
+    local cron_line=""
+
+    info "Starting SSH tunnel DNAT setup..."
+    warn "This command flushes current iptables rules before applying new tunnel rules."
+
+    detected_port="$(detect_current_ssh_port)"
+    detected_iran_ip="$(detect_public_ipv4 || true)"
+    if [[ -z "$detected_iran_ip" ]]; then
+        detected_iran_ip="87.248.152.162"
+    fi
+
+    while true; do
+        iran_port="$(prompt_with_default "Iran SSH port (incoming port on this server)" "$detected_port")"
+        if is_valid_port "$iran_port"; then
+            break
+        fi
+        warn "Invalid port. Please enter a number between 1 and 65535."
+    done
+
+    while true; do
+        iran_host="$(prompt_with_default "Iran public IP/domain" "$detected_iran_ip")"
+        if iran_ip="$(resolve_ipv4 "$iran_host")"; then
+            break
+        fi
+        warn "Could not resolve '$iran_host' to IPv4. Enter a valid IP/domain."
+    done
+
+    while true; do
+        eu_host="$(prompt_with_default "EU server IP/domain" "91.107.247.144")"
+        if eu_ip="$(resolve_ipv4 "$eu_host")"; then
+            break
+        fi
+        warn "Could not resolve '$eu_host' to IPv4. Enter a valid IP/domain."
+    done
+
+    while true; do
+        eu_port="$(prompt_with_default "EU server SSH port" "$SSH_PORT")"
+        if is_valid_port "$eu_port"; then
+            break
+        fi
+        warn "Invalid port. Please enter a number between 1 and 65535."
+    done
+
+    eu_user="$(prompt_with_default "EU SSH username (credential note)" "root")"
+    info "Using EU credentials hint: $eu_user"
+    info "Sudo/root credentials may be requested now."
+    run_with_sudo -v
+
+    if prompt_yes_no "Add blacklist/bypass IP so that IP is never routed (recommended)?" "y"; then
+        ssh_client_ip="${SSH_CLIENT:-${SSH_CONNECTION:-}}"
+        ssh_client_ip="${ssh_client_ip%% *}"
+        if [[ -z "$ssh_client_ip" ]]; then
+            ssh_client_ip="$iran_ip"
+        fi
+
+        while true; do
+            blacklist_host="$(prompt_with_default "Blacklist IP/domain" "$ssh_client_ip")"
+            if blacklist_ip="$(resolve_ipv4 "$blacklist_host")"; then
+                break
+            fi
+            warn "Could not resolve '$blacklist_host' to IPv4. Enter a valid IP/domain."
+        done
+    fi
+
+    if ! prompt_yes_no "Apply tunnel rules now?" "y"; then
+        warn "SSH tunnel setup cancelled by user."
+        return 0
+    fi
+
+    info "Applying forwarding: $iran_ip:$iran_port -> $eu_ip:$eu_port"
+    run_with_sudo sysctl -w net.ipv4.ip_forward=1
+    run_with_sudo iptables -F
+    run_with_sudo iptables -t nat -F
+    run_with_sudo iptables -X
+
+    if [[ -n "$blacklist_ip" ]]; then
+        run_with_sudo iptables -t nat -I PREROUTING 1 -p tcp -s "$blacklist_ip" -d "$iran_ip" --dport "$iran_port" -j ACCEPT
+        run_with_sudo iptables -t nat -I PREROUTING 1 -p udp -s "$blacklist_ip" -d "$iran_ip" --dport "$iran_port" -j ACCEPT
+        info "Blacklist bypass enabled for $blacklist_ip (TCP+UDP)."
+    fi
+
+    run_with_sudo iptables -t nat -A PREROUTING -p tcp -d "$iran_ip" --dport "$iran_port" -j DNAT --to-destination "$eu_ip:$eu_port"
+    run_with_sudo iptables -t nat -A PREROUTING -p udp -d "$iran_ip" --dport "$iran_port" -j DNAT --to-destination "$eu_ip:$eu_port"
+    run_with_sudo iptables -t nat -A POSTROUTING -p tcp -d "$eu_ip" --dport "$eu_port" -j MASQUERADE
+    run_with_sudo iptables -t nat -A POSTROUTING -p udp -d "$eu_ip" --dport "$eu_port" -j MASQUERADE
+    run_with_sudo iptables -A FORWARD -p tcp -d "$eu_ip" --dport "$eu_port" -j ACCEPT
+    run_with_sudo iptables -A FORWARD -p udp -d "$eu_ip" --dport "$eu_port" -j ACCEPT
+    run_with_sudo iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+    success "SSH tunnel rules applied."
+
+    if prompt_yes_no "Enable this on reboot (iptables-persistent + cron)?" "n"; then
+        info "Installing persistence packages..."
+        run_with_sudo apt-get update -y
+        run_with_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
+        run_with_sudo netfilter-persistent save
+        echo "net.ipv4.ip_forward=1" | run_with_sudo tee /etc/sysctl.d/99-sshtunnel-ipforward.conf >/dev/null
+
+        reboot_script="$(write_sshtunnel_reboot_script "$iran_ip" "$iran_port" "$eu_ip" "$eu_port" "$blacklist_ip")"
+        cron_line="@reboot $reboot_script >/var/log/sshtunnel-restore.log 2>&1"
+
+        if command -v crontab &>/dev/null; then
+            ensure_root_cron_job "$cron_line"
+        else
+            warn "crontab not found. Reboot script created at $reboot_script but cron entry was skipped."
+        fi
+
+        success "Reboot persistence enabled."
+    else
+        info "Reboot persistence skipped."
+    fi
+}
+
+# ------------------------------------------------------------
 # STEP ALL: RUN EVERYTHING IN ORDER
 # ------------------------------------------------------------
 run_all() {
@@ -292,18 +572,20 @@ run_all() {
 # ------------------------------------------------------------
 usage() {
     cat <<EOF
-Usage: $0 {users|ssh|recaptcha|udgpw|bbr|all} [port] [users_list]
+Usage: $0 {users|ssh|recaptcha|udgpw|bbr|sshtunnel|all} [port] [users_list]
 
   users      - Create users from list (comma-separated)
   ssh        - Change SSH port (default $SSH_PORT) and set ciphers
   recaptcha  - Run install_kernel.sh (reCAPTCHA step)
   udgpw      - Set UDPGW port to $UDPGW_PORT (silent, auto‑correct)
   bbr        - Enable BBR (install_kernel.sh second pass)
+  sshtunnel  - Interactive SSH DNAT tunnel + optional reboot persistence
   all        - Execute all steps in the correct order (requires users list)
 
 Example:
   $0 users shayan,anothername
   $0 ssh 2233
+  $0 sshtunnel
   $0 all 2233 shayan,anothername
   $0 all shayan,anothername
 EOF
@@ -320,6 +602,7 @@ case "$1" in
     recaptcha)  run_recaptcha ;;
     udgpw)      run_udgpw ;;
     bbr)        run_bbr ;;
+    sshtunnel)  run_sshtunnel ;;
     all)
         if [[ "${2-}" =~ ^[0-9]+$ ]]; then
             parse_port_arg "${2-}"
