@@ -248,7 +248,7 @@ show_sshtunnel_commands() {
     local blacklist_ip="${5:-}"
 
     echo
-    echo "Commands to be executed on this server:"
+    echo "Commands that will run on current server:"
     echo "sudo sysctl -w net.ipv4.ip_forward=1"
     echo "sudo iptables -F"
     echo "sudo iptables -t nat -F"
@@ -539,6 +539,7 @@ run_sshtunnel() {
     local reboot_script=""
     local cron_line=""
     local value=""
+    local enable_reboot_persistence="n"
 
     show_sshtunnel_banner
     info "SSH tunnel DNAT setup (step-by-step)."
@@ -590,7 +591,11 @@ run_sshtunnel() {
 
     info "Step 3/6: Enter EU server public IP/domain."
     while true; do
-        eu_host="$(prompt_with_default "EU server IP/domain" "91.107.247.144")"
+        read -r -p "$(printf '\033[1;36m%s\033[0m: ' "EU server IP/domain (required)")" eu_host
+        if [[ -z "$eu_host" ]]; then
+            warn "EU server IP/domain is required."
+            continue
+        fi
         if eu_ip="$(resolve_ipv4 "$eu_host")"; then
             break
         fi
@@ -630,10 +635,14 @@ run_sshtunnel() {
     fi
 
     info "Step 6/6: Review configuration."
-    echo "  Iran side : $iran_ip:$iran_port"
-    echo "  EU side   : $eu_ip:$eu_port"
-    echo "  Bypass IP : ${blacklist_ip:-none}"
+    echo "  Current server (Iran): $iran_ip:$iran_port"
+    echo "  Destination (EU)     : $eu_ip:$eu_port"
+    echo "  Bypass source IP     : ${blacklist_ip:-none}"
     show_sshtunnel_commands "$iran_ip" "$iran_port" "$eu_ip" "$eu_port" "$blacklist_ip"
+
+    if prompt_yes_no "Also enable these rules on reboot (iptables-persistent + cron)?" "n"; then
+        enable_reboot_persistence="y"
+    fi
 
     if ! prompt_yes_no "Run these commands now?" "y"; then
         warn "SSH tunnel setup cancelled by user."
@@ -662,7 +671,7 @@ run_sshtunnel() {
 
     success "SSH tunnel rules applied."
 
-    if prompt_yes_no "Enable this on reboot (iptables-persistent + cron)?" "n"; then
+    if [[ "$enable_reboot_persistence" == "y" ]]; then
         info "Installing persistence packages..."
         run_with_sudo apt-get update -y
         run_with_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
