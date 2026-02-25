@@ -171,7 +171,32 @@ detect_public_ipv4() {
         fi
     fi
 
-    DETECTED_IRAN_IP_SOURCE="fallback"
+    if command -v ip &>/dev/null; then
+        ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}' || true)"
+        if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP_SOURCE="ip route get"
+            echo "$ip"
+            return 0
+        fi
+
+        ip="$(ip -4 -o addr show scope global up 2>/dev/null | awk 'NR==1 {print $4}' | cut -d/ -f1 || true)"
+        if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP_SOURCE="ip -4 addr"
+            echo "$ip"
+            return 0
+        fi
+    fi
+
+    if command -v hostname &>/dev/null; then
+        ip="$(hostname -I 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i ~ /^([0-9]{1,3}\.){3}[0-9]{1,3}$/) {print $i; exit}}' || true)"
+        if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP_SOURCE="hostname -I"
+            echo "$ip"
+            return 0
+        fi
+    fi
+
+    DETECTED_IRAN_IP_SOURCE=""
     return 1
 }
 
@@ -474,9 +499,6 @@ run_sshtunnel() {
 
     detected_port="$(detect_current_ssh_port)"
     detected_iran_ip="$(detect_public_ipv4 || true)"
-    if [[ -z "$detected_iran_ip" ]]; then
-        detected_iran_ip="87.248.152.162"
-    fi
 
     if [[ "${DETECTED_SSH_PORT_SOURCE:-fallback}" == "fallback" ]]; then
         info "Current SSH port not detected. Fallback is 22. Press Enter to use 22 or type another port."
@@ -484,8 +506,9 @@ run_sshtunnel() {
         info "Detected current SSH port: $detected_port (from ${DETECTED_SSH_PORT_SOURCE}). Press Enter to use it or type another port."
     fi
 
-    if [[ "${DETECTED_IRAN_IP_SOURCE:-fallback}" == "fallback" ]]; then
-        info "Iran public IP not detected automatically. Fallback is 87.248.152.162. Press Enter to use it or type another IP/domain."
+    if [[ -z "$detected_iran_ip" ]]; then
+        info "Iran public IP not detected automatically from public APIs or local interfaces."
+        info "Type this server public IP/domain manually when prompted."
     else
         info "Detected Iran public IP: $detected_iran_ip (from ${DETECTED_IRAN_IP_SOURCE}). Press Enter to use it or type another IP/domain."
     fi
@@ -500,7 +523,16 @@ run_sshtunnel() {
     done
 
     while true; do
-        iran_host="$(prompt_with_default "Iran public IP/domain" "$detected_iran_ip")"
+        if [[ -n "$detected_iran_ip" ]]; then
+            iran_host="$(prompt_with_default "Iran public IP/domain" "$detected_iran_ip")"
+        else
+            read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Iran public IP/domain (required)")" iran_host
+            if [[ -z "$iran_host" ]]; then
+                warn "Iran public IP/domain is required."
+                continue
+            fi
+        fi
+
         if iran_ip="$(resolve_ipv4 "$iran_host")"; then
             break
         fi
