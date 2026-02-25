@@ -10,7 +10,9 @@ SSH_PORT=2233
 CIPHERS="aes128-gcm@openssh.com,aes128-ctr"
 UDPGW_PORT=7305
 STEP_DELAY=1
+DETECTED_SSH_PORT=""
 DETECTED_SSH_PORT_SOURCE=""
+DETECTED_IRAN_IP=""
 DETECTED_IRAN_IP_SOURCE=""
 
 # ------------------------------------------------------------
@@ -127,9 +129,23 @@ prompt_yes_no() {
 
 detect_current_ssh_port() {
     local detected=""
-    local source="fallback"
+    local source=""
 
-    if command -v sshd &>/dev/null; then
+    if command -v ss &>/dev/null; then
+        detected="$(run_with_sudo ss -tlnp 2>/dev/null | awk '
+            /LISTEN/ && /sshd/ {
+                addr=$4
+                gsub(/\[|\]/, "", addr)
+                n=split(addr, parts, ":")
+                p=parts[n]
+                if (p ~ /^[0-9]+$/) { print p; exit }
+            }' || true)"
+        if is_valid_port "${detected:-}"; then
+            source="ss -tlnp (sshd)"
+        fi
+    fi
+
+    if ! is_valid_port "${detected:-}" && command -v sshd &>/dev/null; then
         detected="$(run_with_sudo sshd -T 2>/dev/null | awk '/^port / {print $2; exit}' || true)"
         if is_valid_port "${detected:-}"; then
             source="sshd -T"
@@ -144,29 +160,33 @@ detect_current_ssh_port() {
     fi
 
     if ! is_valid_port "${detected:-}"; then
-        detected="22"
-        source="fallback"
+        detected=""
+        source=""
     fi
 
+    DETECTED_SSH_PORT="$detected"
     DETECTED_SSH_PORT_SOURCE="$source"
-    echo "$detected"
+    [[ -n "$detected" ]]
 }
 
 detect_public_ipv4() {
     local ip=""
 
+    DETECTED_IRAN_IP=""
+    DETECTED_IRAN_IP_SOURCE=""
+
     if command -v curl &>/dev/null; then
         ip="$(curl -4fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
         if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP="$ip"
             DETECTED_IRAN_IP_SOURCE="api.ipify.org"
-            echo "$ip"
             return 0
         fi
 
         ip="$(curl -4fsS --max-time 5 https://ifconfig.me 2>/dev/null || true)"
         if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP="$ip"
             DETECTED_IRAN_IP_SOURCE="ifconfig.me"
-            echo "$ip"
             return 0
         fi
     fi
@@ -174,15 +194,15 @@ detect_public_ipv4() {
     if command -v ip &>/dev/null; then
         ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}' || true)"
         if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP="$ip"
             DETECTED_IRAN_IP_SOURCE="ip route get"
-            echo "$ip"
             return 0
         fi
 
         ip="$(ip -4 -o addr show scope global up 2>/dev/null | awk 'NR==1 {print $4}' | cut -d/ -f1 || true)"
         if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP="$ip"
             DETECTED_IRAN_IP_SOURCE="ip -4 addr"
-            echo "$ip"
             return 0
         fi
     fi
@@ -190,13 +210,12 @@ detect_public_ipv4() {
     if command -v hostname &>/dev/null; then
         ip="$(hostname -I 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i ~ /^([0-9]{1,3}\.){3}[0-9]{1,3}$/) {print $i; exit}}' || true)"
         if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+            DETECTED_IRAN_IP="$ip"
             DETECTED_IRAN_IP_SOURCE="hostname -I"
-            echo "$ip"
             return 0
         fi
     fi
 
-    DETECTED_IRAN_IP_SOURCE=""
     return 1
 }
 
@@ -219,6 +238,35 @@ resolve_ipv4() {
     fi
 
     return 1
+}
+
+show_sshtunnel_commands() {
+    local iran_ip="$1"
+    local iran_port="$2"
+    local eu_ip="$3"
+    local eu_port="$4"
+    local blacklist_ip="${5:-}"
+
+    echo
+    echo "Commands to be executed on this server:"
+    echo "sudo sysctl -w net.ipv4.ip_forward=1"
+    echo "sudo iptables -F"
+    echo "sudo iptables -t nat -F"
+    echo "sudo iptables -X"
+
+    if [[ -n "$blacklist_ip" ]]; then
+        echo "sudo iptables -t nat -I PREROUTING 1 -s $blacklist_ip -p tcp --dport $iran_port -j RETURN"
+        echo "sudo iptables -t nat -I PREROUTING 1 -s $blacklist_ip -p udp --dport $iran_port -j RETURN"
+    fi
+
+    echo "sudo iptables -t nat -A PREROUTING -p tcp -d $iran_ip --dport $iran_port -j DNAT --to-destination $eu_ip:$eu_port"
+    echo "sudo iptables -t nat -A PREROUTING -p udp -d $iran_ip --dport $iran_port -j DNAT --to-destination $eu_ip:$eu_port"
+    echo "sudo iptables -t nat -A POSTROUTING -p tcp -d $eu_ip --dport $eu_port -j MASQUERADE"
+    echo "sudo iptables -t nat -A POSTROUTING -p udp -d $eu_ip --dport $eu_port -j MASQUERADE"
+    echo "sudo iptables -A FORWARD -p tcp -d $eu_ip --dport $eu_port -j ACCEPT"
+    echo "sudo iptables -A FORWARD -p udp -d $eu_ip --dport $eu_port -j ACCEPT"
+    echo "sudo iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+    echo
 }
 
 ensure_root_cron_job() {
@@ -259,8 +307,8 @@ write_sshtunnel_reboot_script() {
     local blacklist_udp_rule=""
 
     if [[ -n "$blacklist_ip" ]]; then
-        blacklist_tcp_rule="\"\$IPTABLES_BIN\" -t nat -I PREROUTING 1 -p tcp -s $blacklist_ip -d $iran_ip --dport $iran_port -j ACCEPT"
-        blacklist_udp_rule="\"\$IPTABLES_BIN\" -t nat -I PREROUTING 1 -p udp -s $blacklist_ip -d $iran_ip --dport $iran_port -j ACCEPT"
+        blacklist_tcp_rule="\"\$IPTABLES_BIN\" -t nat -I PREROUTING 1 -s $blacklist_ip -p tcp --dport $iran_port -j RETURN"
+        blacklist_udp_rule="\"\$IPTABLES_BIN\" -t nat -I PREROUTING 1 -s $blacklist_ip -p udp --dport $iran_port -j RETURN"
     fi
 
     run_with_sudo tee "$script_path" >/dev/null <<EOF
@@ -479,8 +527,6 @@ run_bbr() {
 # STEP X: SSH TUNNEL DNAT (INTERACTIVE)
 # ------------------------------------------------------------
 run_sshtunnel() {
-    local detected_port=""
-    local detected_iran_ip=""
     local iran_port=""
     local iran_host=""
     local iran_ip=""
@@ -492,53 +538,57 @@ run_sshtunnel() {
     local blacklist_ip=""
     local reboot_script=""
     local cron_line=""
+    local value=""
 
     show_sshtunnel_banner
-    info "Starting SSH tunnel DNAT setup..."
-    warn "This command flushes current iptables rules before applying new tunnel rules."
+    info "SSH tunnel DNAT setup (step-by-step)."
+    warn "This will flush current iptables rules before adding tunnel rules."
+    info "No command is executed until final confirmation."
 
-    detected_port="$(detect_current_ssh_port)"
-    detected_iran_ip="$(detect_public_ipv4 || true)"
-
-    if [[ "${DETECTED_SSH_PORT_SOURCE:-fallback}" == "fallback" ]]; then
-        info "Current SSH port not detected. Fallback is 22. Press Enter to use 22 or type another port."
+    info "Step 1/6: Detect current server public IP (Iran side)."
+    detect_public_ipv4 || true
+    if [[ -n "$DETECTED_IRAN_IP" ]]; then
+        info "Detected current server IP: $DETECTED_IRAN_IP (source: $DETECTED_IRAN_IP_SOURCE)"
+        if prompt_yes_no "Use this as Iran public IP?" "y"; then
+            iran_ip="$DETECTED_IRAN_IP"
+        fi
     else
-        info "Detected current SSH port: $detected_port (from ${DETECTED_SSH_PORT_SOURCE}). Press Enter to use it or type another port."
+        warn "Could not auto-detect current server public IP."
     fi
 
-    if [[ -z "$detected_iran_ip" ]]; then
-        info "Iran public IP not detected automatically from public APIs or local interfaces."
-        info "Type this server public IP/domain manually when prompted."
-    else
-        info "Detected Iran public IP: $detected_iran_ip (from ${DETECTED_IRAN_IP_SOURCE}). Press Enter to use it or type another IP/domain."
-    fi
-    info "This command only configures local iptables/sysctl on this server (no login to EU server)."
-
-    while true; do
-        iran_port="$(prompt_with_default "Iran SSH port (incoming port on this server)" "$detected_port")"
-        if is_valid_port "$iran_port"; then
-            break
+    while [[ -z "$iran_ip" ]]; do
+        read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Iran public IP/domain (required)")" iran_host
+        if [[ -z "$iran_host" ]]; then
+            warn "Iran public IP/domain is required."
+            continue
         fi
-        warn "Invalid port. Please enter a number between 1 and 65535."
-    done
-
-    while true; do
-        if [[ -n "$detected_iran_ip" ]]; then
-            iran_host="$(prompt_with_default "Iran public IP/domain" "$detected_iran_ip")"
-        else
-            read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Iran public IP/domain (required)")" iran_host
-            if [[ -z "$iran_host" ]]; then
-                warn "Iran public IP/domain is required."
-                continue
-            fi
-        fi
-
         if iran_ip="$(resolve_ipv4 "$iran_host")"; then
             break
         fi
         warn "Could not resolve '$iran_host' to IPv4. Enter a valid IP/domain."
     done
 
+    info "Step 2/6: Detect current SSH port on this server."
+    detect_current_ssh_port || true
+    if [[ -n "$DETECTED_SSH_PORT" ]]; then
+        info "Detected SSH port: $DETECTED_SSH_PORT (source: $DETECTED_SSH_PORT_SOURCE)"
+        if prompt_yes_no "Use this as Iran incoming port?" "y"; then
+            iran_port="$DETECTED_SSH_PORT"
+        fi
+    else
+        warn "Could not auto-detect SSH port."
+    fi
+
+    while [[ -z "$iran_port" ]]; do
+        read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Iran incoming SSH port on this server (required)")" value
+        if ! is_valid_port "$value"; then
+            warn "Invalid port. Enter a number between 1 and 65535."
+            continue
+        fi
+        iran_port="$value"
+    done
+
+    info "Step 3/6: Enter EU server public IP/domain."
     while true; do
         eu_host="$(prompt_with_default "EU server IP/domain" "91.107.247.144")"
         if eu_ip="$(resolve_ipv4 "$eu_host")"; then
@@ -547,6 +597,7 @@ run_sshtunnel() {
         warn "Could not resolve '$eu_host' to IPv4. Enter a valid IP/domain."
     done
 
+    info "Step 4/6: Enter EU server SSH port."
     while true; do
         eu_port="$(prompt_with_default "EU server SSH port" "$SSH_PORT")"
         if is_valid_port "$eu_port"; then
@@ -555,15 +606,22 @@ run_sshtunnel() {
         warn "Invalid port. Please enter a number between 1 and 65535."
     done
 
-    if prompt_yes_no "Add blacklist/bypass IP so that IP is never routed (recommended)?" "y"; then
+    info "Step 5/6: Optional bypass IP (will skip DNAT)."
+    if prompt_yes_no "Add bypass IP?" "y"; then
         ssh_client_ip="${SSH_CLIENT:-${SSH_CONNECTION:-}}"
         ssh_client_ip="${ssh_client_ip%% *}"
-        if [[ -z "$ssh_client_ip" ]]; then
-            ssh_client_ip="$iran_ip"
-        fi
 
         while true; do
-            blacklist_host="$(prompt_with_default "Blacklist IP/domain" "$ssh_client_ip")"
+            if [[ -n "$ssh_client_ip" ]]; then
+                blacklist_host="$(prompt_with_default "Bypass IP/domain" "$ssh_client_ip")"
+            else
+                read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Bypass IP/domain (required)")" blacklist_host
+                if [[ -z "$blacklist_host" ]]; then
+                    warn "Bypass IP/domain is required."
+                    continue
+                fi
+            fi
+
             if blacklist_ip="$(resolve_ipv4 "$blacklist_host")"; then
                 break
             fi
@@ -571,7 +629,13 @@ run_sshtunnel() {
         done
     fi
 
-    if ! prompt_yes_no "Apply tunnel rules now?" "y"; then
+    info "Step 6/6: Review configuration."
+    echo "  Iran side : $iran_ip:$iran_port"
+    echo "  EU side   : $eu_ip:$eu_port"
+    echo "  Bypass IP : ${blacklist_ip:-none}"
+    show_sshtunnel_commands "$iran_ip" "$iran_port" "$eu_ip" "$eu_port" "$blacklist_ip"
+
+    if ! prompt_yes_no "Run these commands now?" "y"; then
         warn "SSH tunnel setup cancelled by user."
         return 0
     fi
@@ -583,9 +647,9 @@ run_sshtunnel() {
     run_with_sudo iptables -X
 
     if [[ -n "$blacklist_ip" ]]; then
-        run_with_sudo iptables -t nat -I PREROUTING 1 -p tcp -s "$blacklist_ip" -d "$iran_ip" --dport "$iran_port" -j ACCEPT
-        run_with_sudo iptables -t nat -I PREROUTING 1 -p udp -s "$blacklist_ip" -d "$iran_ip" --dport "$iran_port" -j ACCEPT
-        info "Blacklist bypass enabled for $blacklist_ip (TCP+UDP)."
+        run_with_sudo iptables -t nat -I PREROUTING 1 -s "$blacklist_ip" -p tcp --dport "$iran_port" -j RETURN
+        run_with_sudo iptables -t nat -I PREROUTING 1 -s "$blacklist_ip" -p udp --dport "$iran_port" -j RETURN
+        info "Bypass enabled for $blacklist_ip on incoming port $iran_port (TCP+UDP)."
     fi
 
     run_with_sudo iptables -t nat -A PREROUTING -p tcp -d "$iran_ip" --dport "$iran_port" -j DNAT --to-destination "$eu_ip:$eu_port"
