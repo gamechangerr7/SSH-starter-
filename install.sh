@@ -838,21 +838,6 @@ monitor_show_action_ascii() {
     local action="${1:-menu}"
     echo -e "\033[1;36m"
     case "$action" in
-        menu)
-            cat <<'EOF'
- ██████   ██████ ██████████ ██████   █████ █████  █████
-▒▒██████ ██████ ▒▒███▒▒▒▒▒█▒▒██████ ▒▒███ ▒▒███  ▒▒███ 
- ▒███▒█████▒███  ▒███  █ ▒  ▒███▒███ ▒███  ▒███   ▒███ 
- ▒███▒▒███ ▒███  ▒██████    ▒███▒▒███▒███  ▒███   ▒███ 
- ▒███ ▒▒▒  ▒███  ▒███▒▒█    ▒███ ▒▒██████  ▒███   ▒███ 
- ▒███      ▒███  ▒███ ▒   █ ▒███  ▒▒█████  ▒███   ▒███ 
- █████     █████ ██████████ █████  ▒▒█████ ▒▒████████  
-▒▒▒▒▒     ▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒▒▒▒   
-                                                       
-                                                       
-                                                       
-EOF
-            ;;
         install)
             cat <<'EOF'
  █████ ██████   █████  █████████  ███████████   █████████   █████       █████      
@@ -1749,9 +1734,6 @@ monitor_show_logs() {
 monitor_menu() {
     local choice=""
     clear || true
-    show_monitor_banner
-    monitor_show_action_ascii "menu"
-    echo "====================== MONITOR MENU ========================"
     echo "  [1] Install or update monitoring system"
     echo "  [2] Edit panel username/password/settings"
     echo "  [3] Restart monitor panel"
@@ -1759,7 +1741,6 @@ monitor_menu() {
     echo "  [5] Live monitor logs (press q to quit)"
     echo "  [6] Show runtime commands"
     echo "  [7] Exit"
-    echo "============================================================"
     read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Select option [1-7]")" choice
 
     case "$choice" in
