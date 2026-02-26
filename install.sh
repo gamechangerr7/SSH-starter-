@@ -24,6 +24,120 @@ err()  { echo -e "\033[1;31m[ERROR]\033[0m $1" >&2; }
 success() { echo -e "\033[1;32m[✔]\033[0m $1"; }
 fail() { echo -e "\033[1;31m[✘]\033[0m $1"; }
 
+# ASCIIPLEASE_EDIT_THIS_LINE_CORE: Customize core command ASCII arts in this function.
+show_core_action_ascii() {
+    local action="${1:-main}"
+    echo -e "\033[1;32m"
+    case "$action" in
+        users)
+            cat <<'EOF'
+ █████  █████  █████████  ██████████ ███████████    █████████ 
+▒▒███  ▒▒███  ███▒▒▒▒▒███▒▒███▒▒▒▒▒█▒▒███▒▒▒▒▒███  ███▒▒▒▒▒███
+ ▒███   ▒███ ▒███    ▒▒▒  ▒███  █ ▒  ▒███    ▒███ ▒███    ▒▒▒ 
+ ▒███   ▒███ ▒▒█████████  ▒██████    ▒██████████  ▒▒█████████ 
+ ▒███   ▒███  ▒▒▒▒▒▒▒▒███ ▒███▒▒█    ▒███▒▒▒▒▒███  ▒▒▒▒▒▒▒▒███
+ ▒███   ▒███  ███    ▒███ ▒███ ▒   █ ▒███    ▒███  ███    ▒███
+ ▒▒████████  ▒▒█████████  ██████████ █████   █████▒▒█████████ 
+  ▒▒▒▒▒▒▒▒    ▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒   ▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒  
+                                                              
+                                                              
+                                                              
+EOF
+            ;;
+        ssh)
+            cat <<'EOF'
+  █████████   █████████  █████   █████
+ ███▒▒▒▒▒███ ███▒▒▒▒▒███▒▒███   ▒▒███ 
+▒███    ▒▒▒ ▒███    ▒▒▒  ▒███    ▒███ 
+▒▒█████████ ▒▒█████████  ▒███████████ 
+ ▒▒▒▒▒▒▒▒███ ▒▒▒▒▒▒▒▒███ ▒███▒▒▒▒▒███ 
+ ███    ▒███ ███    ▒███ ▒███    ▒███ 
+▒▒█████████ ▒▒█████████  █████   █████
+ ▒▒▒▒▒▒▒▒▒   ▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒   ▒▒▒▒▒ 
+                                      
+                                      
+                                      
+EOF
+            ;;
+        recaptcha)
+            cat <<'EOF'
+ ███████████   ██████████   █████████    █████████   ███████████  ███████████   █████████  █████   █████   █████████  
+▒▒███▒▒▒▒▒███ ▒▒███▒▒▒▒▒█  ███▒▒▒▒▒███  ███▒▒▒▒▒███ ▒▒███▒▒▒▒▒███▒█▒▒▒███▒▒▒█  ███▒▒▒▒▒███▒▒███   ▒▒███   ███▒▒▒▒▒███ 
+ ▒███    ▒███  ▒███  █ ▒  ███     ▒▒▒  ▒███    ▒███  ▒███    ▒███▒   ▒███  ▒  ███     ▒▒▒  ▒███    ▒███  ▒███    ▒███ 
+ ▒██████████   ▒██████   ▒███          ▒███████████  ▒██████████     ▒███    ▒███          ▒███████████  ▒███████████ 
+ ▒███▒▒▒▒▒███  ▒███▒▒█   ▒███          ▒███▒▒▒▒▒███  ▒███▒▒▒▒▒▒      ▒███    ▒███          ▒███▒▒▒▒▒███  ▒███▒▒▒▒▒███ 
+ ▒███    ▒███  ▒███ ▒   █▒▒███     ███ ▒███    ▒███  ▒███            ▒███    ▒▒███     ███ ▒███    ▒███  ▒███    ▒███ 
+ █████   █████ ██████████ ▒▒█████████  █████   █████ █████           █████    ▒▒█████████  █████   █████ █████   █████
+▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒   ▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒           ▒▒▒▒▒      ▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒   ▒▒▒▒▒ 
+                                                                                                                      
+                                                                                                                      
+                                                                                                                      
+EOF
+            ;;
+        udgpw)
+            cat <<'EOF'
+ █████  █████ ██████████     █████████  ███████████  █████   ███   █████
+▒▒███  ▒▒███ ▒▒███▒▒▒▒███   ███▒▒▒▒▒███▒▒███▒▒▒▒▒███▒▒███   ▒███  ▒▒███ 
+ ▒███   ▒███  ▒███   ▒▒███ ███     ▒▒▒  ▒███    ▒███ ▒███   ▒███   ▒███ 
+ ▒███   ▒███  ▒███    ▒███▒███          ▒██████████  ▒███   ▒███   ▒███ 
+ ▒███   ▒███  ▒███    ▒███▒███    █████ ▒███▒▒▒▒▒▒   ▒▒███  █████  ███  
+ ▒███   ▒███  ▒███    ███ ▒▒███  ▒▒███  ▒███          ▒▒▒█████▒█████▒   
+ ▒▒████████   ██████████   ▒▒█████████  █████           ▒▒███ ▒▒███     
+  ▒▒▒▒▒▒▒▒   ▒▒▒▒▒▒▒▒▒▒     ▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒             ▒▒▒   ▒▒▒      
+                                                                        
+                                                                        
+                                                                        
+EOF
+            ;;
+        bbr)
+            cat <<'EOF'
+ ███████████  ███████████  ███████████  
+▒▒███▒▒▒▒▒███▒▒███▒▒▒▒▒███▒▒███▒▒▒▒▒███ 
+ ▒███    ▒███ ▒███    ▒███ ▒███    ▒███ 
+ ▒██████████  ▒██████████  ▒██████████  
+ ▒███▒▒▒▒▒███ ▒███▒▒▒▒▒███ ▒███▒▒▒▒▒███ 
+ ▒███    ▒███ ▒███    ▒███ ▒███    ▒███ 
+ ███████████  ███████████  █████   █████
+▒▒▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒   ▒▒▒▒▒ 
+                                        
+                                        
+                                        
+EOF
+            ;;
+        all)
+            cat <<'EOF'
+   █████████   █████       █████          ███████████  ███████████      ███████      █████████  ██████████  █████████   █████████ 
+  ███▒▒▒▒▒███ ▒▒███       ▒▒███          ▒▒███▒▒▒▒▒███▒▒███▒▒▒▒▒███   ███▒▒▒▒▒███   ███▒▒▒▒▒███▒▒███▒▒▒▒▒█ ███▒▒▒▒▒███ ███▒▒▒▒▒███
+ ▒███    ▒███  ▒███        ▒███           ▒███    ▒███ ▒███    ▒███  ███     ▒▒███ ███     ▒▒▒  ▒███  █ ▒ ▒███    ▒▒▒ ▒███    ▒▒▒ 
+ ▒███████████  ▒███        ▒███           ▒██████████  ▒██████████  ▒███      ▒███▒███          ▒██████   ▒▒█████████ ▒▒█████████ 
+ ▒███▒▒▒▒▒███  ▒███        ▒███           ▒███▒▒▒▒▒▒   ▒███▒▒▒▒▒███ ▒███      ▒███▒███          ▒███▒▒█    ▒▒▒▒▒▒▒▒███ ▒▒▒▒▒▒▒▒███
+ ▒███    ▒███  ▒███      █ ▒███      █    ▒███         ▒███    ▒███ ▒▒███     ███ ▒▒███     ███ ▒███ ▒   █ ███    ▒███ ███    ▒███
+ █████   █████ ███████████ ███████████    █████        █████   █████ ▒▒▒███████▒   ▒▒█████████  ██████████▒▒█████████ ▒▒█████████ 
+▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒▒    ▒▒▒▒▒        ▒▒▒▒▒   ▒▒▒▒▒    ▒▒▒▒▒▒▒      ▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒   ▒▒▒▒▒▒▒▒▒  
+                                                                                                                                  
+                                                                                                                                  
+                                                                                                                                  
+EOF
+            ;;
+        *)
+            cat <<'EOF'
+  █████████  █████   █████   █████████   █████ █████   █████████   ██████   █████
+ ███▒▒▒▒▒███▒▒███   ▒▒███   ███▒▒▒▒▒███ ▒▒███ ▒▒███   ███▒▒▒▒▒███ ▒▒██████ ▒▒███ 
+▒███    ▒▒▒  ▒███    ▒███  ▒███    ▒███  ▒▒███ ███   ▒███    ▒███  ▒███▒███ ▒███ 
+▒▒█████████  ▒███████████  ▒███████████   ▒▒█████    ▒███████████  ▒███▒▒███▒███ 
+ ▒▒▒▒▒▒▒▒███ ▒███▒▒▒▒▒███  ▒███▒▒▒▒▒███    ▒▒███     ▒███▒▒▒▒▒███  ▒███ ▒▒██████ 
+ ███    ▒███ ▒███    ▒███  ▒███    ▒███     ▒███     ▒███    ▒███  ▒███  ▒▒█████ 
+▒▒█████████  █████   █████ █████   █████    █████    █████   █████ █████  ▒▒█████
+ ▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒   ▒▒▒▒▒    ▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒    ▒▒▒▒▒ 
+                                                                                 
+                                                                                 
+                                                                                 
+EOF
+            ;;
+    esac
+    echo -e "\033[0m"
+}
+
 show_sshtunnel_banner() {
     echo -e "\033[1;35m"
     cat <<'EOF'
@@ -342,6 +456,7 @@ EOF
 # STEP 1: CREATE USERS
 # ------------------------------------------------------------
 add_users() {
+    show_core_action_ascii "users"
     info "Adding system users..."
     local home_dir=""
     for u in "${USERS[@]}"; do
@@ -364,6 +479,7 @@ add_users() {
 # STEP 2: CONFIGURE SSHD (port + ciphers) & RESTART
 # ------------------------------------------------------------
 configure_ssh() {
+    show_core_action_ascii "ssh"
     info "Configuring SSH (port $SSH_PORT, ciphers)..."
     local sshd_config="/etc/ssh/sshd_config"
     local backup="${sshd_config}.bak.$(date +%Y%m%d%H%M%S)"
@@ -398,6 +514,7 @@ configure_ssh() {
 # answers: 1 (English), 12, y, y, 1
 # ------------------------------------------------------------
 run_recaptcha() {
+    show_core_action_ascii "recaptcha"
     info "Downloading install_kernel.sh (reCAPTCHA phase) if missing..."
     if [[ ! -f install_kernel.sh ]]; then
         curl -O https://raw.githubusercontent.com/jinwyp/one_click_script/master/install_kernel.sh
@@ -418,6 +535,7 @@ run_recaptcha() {
 # STEP 4A: UDPGW PORT CHANGE – SILENT BACKGROUND + CLEAR VERIFICATION
 # ------------------------------------------------------------
 run_udgpw() {
+    show_core_action_ascii "udgpw"
     local env_file="/var/www/html/app/.env"
     local badvpn_dir="/root/badvpn"
     local build_dir="/root/badvpn/badvpn-build"
@@ -514,6 +632,7 @@ EOF
 # answers: 2, 2, 4, y, y
 # ------------------------------------------------------------
 run_bbr() {
+    show_core_action_ascii "bbr"
     info "Enabling BBR (via install_kernel.sh)..."
     if [[ ! -f install_kernel.sh ]]; then
         curl -O https://raw.githubusercontent.com/jinwyp/one_click_script/master/install_kernel.sh
@@ -714,6 +833,166 @@ EOF
     echo -e "\033[0m"
 }
 
+# ASCIIPLEASE_EDIT_THIS_LINE: Customize monitor ASCII arts in this function.
+monitor_show_action_ascii() {
+    local action="${1:-menu}"
+    echo -e "\033[1;36m"
+    case "$action" in
+        menu)
+            cat <<'EOF'
+ ██████   ██████ ██████████ ██████   █████ █████  █████
+▒▒██████ ██████ ▒▒███▒▒▒▒▒█▒▒██████ ▒▒███ ▒▒███  ▒▒███ 
+ ▒███▒█████▒███  ▒███  █ ▒  ▒███▒███ ▒███  ▒███   ▒███ 
+ ▒███▒▒███ ▒███  ▒██████    ▒███▒▒███▒███  ▒███   ▒███ 
+ ▒███ ▒▒▒  ▒███  ▒███▒▒█    ▒███ ▒▒██████  ▒███   ▒███ 
+ ▒███      ▒███  ▒███ ▒   █ ▒███  ▒▒█████  ▒███   ▒███ 
+ █████     █████ ██████████ █████  ▒▒█████ ▒▒████████  
+▒▒▒▒▒     ▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒▒▒▒   
+                                                       
+                                                       
+                                                       
+EOF
+            ;;
+        install)
+            cat <<'EOF'
+ █████ ██████   █████  █████████  ███████████   █████████   █████       █████      
+▒▒███ ▒▒██████ ▒▒███  ███▒▒▒▒▒███▒█▒▒▒███▒▒▒█  ███▒▒▒▒▒███ ▒▒███       ▒▒███       
+ ▒███  ▒███▒███ ▒███ ▒███    ▒▒▒ ▒   ▒███  ▒  ▒███    ▒███  ▒███        ▒███       
+ ▒███  ▒███▒▒███▒███ ▒▒█████████     ▒███     ▒███████████  ▒███        ▒███       
+ ▒███  ▒███ ▒▒██████  ▒▒▒▒▒▒▒▒███    ▒███     ▒███▒▒▒▒▒███  ▒███        ▒███       
+ ▒███  ▒███  ▒▒█████  ███    ▒███    ▒███     ▒███    ▒███  ▒███      █ ▒███      █
+ █████ █████  ▒▒█████▒▒█████████     █████    █████   █████ ███████████ ███████████
+▒▒▒▒▒ ▒▒▒▒▒    ▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒     ▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒▒ 
+                                                                                   
+                                                                                   
+                                                                                   
+EOF
+            ;;
+        edit)
+            cat <<'EOF'
+ ██████████ ██████████   █████ ███████████
+▒▒███▒▒▒▒▒█▒▒███▒▒▒▒███ ▒▒███ ▒█▒▒▒███▒▒▒█
+ ▒███  █ ▒  ▒███   ▒▒███ ▒███ ▒   ▒███  ▒ 
+ ▒██████    ▒███    ▒███ ▒███     ▒███    
+ ▒███▒▒█    ▒███    ▒███ ▒███     ▒███    
+ ▒███ ▒   █ ▒███    ███  ▒███     ▒███    
+ ██████████ ██████████   █████    █████   
+▒▒▒▒▒▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒   ▒▒▒▒▒    ▒▒▒▒▒    
+                                          
+                                          
+                                          
+EOF
+            ;;
+        restart)
+            cat <<'EOF'
+ ███████████   ██████████  █████████  ███████████   █████████   ███████████   ███████████
+▒▒███▒▒▒▒▒███ ▒▒███▒▒▒▒▒█ ███▒▒▒▒▒███▒█▒▒▒███▒▒▒█  ███▒▒▒▒▒███ ▒▒███▒▒▒▒▒███ ▒█▒▒▒███▒▒▒█
+ ▒███    ▒███  ▒███  █ ▒ ▒███    ▒▒▒ ▒   ▒███  ▒  ▒███    ▒███  ▒███    ▒███ ▒   ▒███  ▒ 
+ ▒██████████   ▒██████   ▒▒█████████     ▒███     ▒███████████  ▒██████████      ▒███    
+ ▒███▒▒▒▒▒███  ▒███▒▒█    ▒▒▒▒▒▒▒▒███    ▒███     ▒███▒▒▒▒▒███  ▒███▒▒▒▒▒███     ▒███    
+ ▒███    ▒███  ▒███ ▒   █ ███    ▒███    ▒███     ▒███    ▒███  ▒███    ▒███     ▒███    
+ █████   █████ ██████████▒▒█████████     █████    █████   █████ █████   █████    █████   
+▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒▒     ▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒   ▒▒▒▒▒    ▒▒▒▒▒    
+                                                                                         
+                                                                                         
+                                                                                         
+EOF
+            ;;
+        status)
+            cat <<'EOF'
+  █████████  ███████████   █████████   ███████████ █████  █████  █████████ 
+ ███▒▒▒▒▒███▒█▒▒▒███▒▒▒█  ███▒▒▒▒▒███ ▒█▒▒▒███▒▒▒█▒▒███  ▒▒███  ███▒▒▒▒▒███
+▒███    ▒▒▒ ▒   ▒███  ▒  ▒███    ▒███ ▒   ▒███  ▒  ▒███   ▒███ ▒███    ▒▒▒ 
+▒▒█████████     ▒███     ▒███████████     ▒███     ▒███   ▒███ ▒▒█████████ 
+ ▒▒▒▒▒▒▒▒███    ▒███     ▒███▒▒▒▒▒███     ▒███     ▒███   ▒███  ▒▒▒▒▒▒▒▒███
+ ███    ▒███    ▒███     ▒███    ▒███     ▒███     ▒███   ▒███  ███    ▒███
+▒▒█████████     █████    █████   █████    █████    ▒▒████████  ▒▒█████████ 
+ ▒▒▒▒▒▒▒▒▒     ▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒    ▒▒▒▒▒      ▒▒▒▒▒▒▒▒    ▒▒▒▒▒▒▒▒▒  
+                                                                           
+                                                                           
+                                                                           
+EOF
+            ;;
+        logs)
+            cat <<'EOF'
+ █████          ███████      █████████   █████████ 
+▒▒███         ███▒▒▒▒▒███   ███▒▒▒▒▒███ ███▒▒▒▒▒███
+ ▒███        ███     ▒▒███ ███     ▒▒▒ ▒███    ▒▒▒ 
+ ▒███       ▒███      ▒███▒███         ▒▒█████████ 
+ ▒███       ▒███      ▒███▒███    █████ ▒▒▒▒▒▒▒▒███
+ ▒███      █▒▒███     ███ ▒▒███  ▒▒███  ███    ▒███
+ ███████████ ▒▒▒███████▒   ▒▒█████████ ▒▒█████████ 
+▒▒▒▒▒▒▒▒▒▒▒    ▒▒▒▒▒▒▒      ▒▒▒▒▒▒▒▒▒   ▒▒▒▒▒▒▒▒▒  
+                                                   
+                                                   
+                                                   
+EOF
+            ;;
+        commands)
+            cat <<'EOF'
+   █████████     ███████    ██████   ██████ ██████   ██████   █████████   ██████   █████ ██████████    █████████ 
+  ███▒▒▒▒▒███  ███▒▒▒▒▒███ ▒▒██████ ██████ ▒▒██████ ██████   ███▒▒▒▒▒███ ▒▒██████ ▒▒███ ▒▒███▒▒▒▒███  ███▒▒▒▒▒███
+ ███     ▒▒▒  ███     ▒▒███ ▒███▒█████▒███  ▒███▒█████▒███  ▒███    ▒███  ▒███▒███ ▒███  ▒███   ▒▒███▒███    ▒▒▒ 
+▒███         ▒███      ▒███ ▒███▒▒███ ▒███  ▒███▒▒███ ▒███  ▒███████████  ▒███▒▒███▒███  ▒███    ▒███▒▒█████████ 
+▒███         ▒███      ▒███ ▒███ ▒▒▒  ▒███  ▒███ ▒▒▒  ▒███  ▒███▒▒▒▒▒███  ▒███ ▒▒██████  ▒███    ▒███ ▒▒▒▒▒▒▒▒███
+▒▒███     ███▒▒███     ███  ▒███      ▒███  ▒███      ▒███  ▒███    ▒███  ▒███  ▒▒█████  ▒███    ███  ███    ▒███
+ ▒▒█████████  ▒▒▒███████▒   █████     █████ █████     █████ █████   █████ █████  ▒▒█████ ██████████  ▒▒█████████ 
+  ▒▒▒▒▒▒▒▒▒     ▒▒▒▒▒▒▒    ▒▒▒▒▒     ▒▒▒▒▒ ▒▒▒▒▒     ▒▒▒▒▒ ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒    ▒▒▒▒▒ ▒▒▒▒▒▒▒▒▒▒    ▒▒▒▒▒▒▒▒▒  
+                                                                                                                 
+                                                                                                                 
+                                                                                                                 
+EOF
+            ;;
+        *)
+            cat <<'EOF'
+
+ ██████   ██████    ███████    ██████   █████ █████ ███████████    ███████    ███████████  
+▒▒██████ ██████   ███▒▒▒▒▒███ ▒▒██████ ▒▒███ ▒▒███ ▒█▒▒▒███▒▒▒█  ███▒▒▒▒▒███ ▒▒███▒▒▒▒▒███ 
+ ▒███▒█████▒███  ███     ▒▒███ ▒███▒███ ▒███  ▒███ ▒   ▒███  ▒  ███     ▒▒███ ▒███    ▒███ 
+ ▒███▒▒███ ▒███ ▒███      ▒███ ▒███▒▒███▒███  ▒███     ▒███    ▒███      ▒███ ▒██████████  
+ ▒███ ▒▒▒  ▒███ ▒███      ▒███ ▒███ ▒▒██████  ▒███     ▒███    ▒███      ▒███ ▒███▒▒▒▒▒███ 
+ ▒███      ▒███ ▒▒███     ███  ▒███  ▒▒█████  ▒███     ▒███    ▒▒███     ███  ▒███    ▒███ 
+ █████     █████ ▒▒▒███████▒   █████  ▒▒█████ █████    █████    ▒▒▒███████▒   █████   █████
+▒▒▒▒▒     ▒▒▒▒▒    ▒▒▒▒▒▒▒    ▒▒▒▒▒    ▒▒▒▒▒ ▒▒▒▒▒    ▒▒▒▒▒       ▒▒▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ 
+    
+EOF
+            ;;
+    esac
+    echo -e "\033[0m"
+}
+
+monitor_random_port() {
+    local p=""
+    if command -v shuf &>/dev/null; then
+        p="$(shuf -i 1024-65535 -n 1)"
+    else
+        p="$(( (((RANDOM << 15) | RANDOM) % (65535 - 1024 + 1)) + 1024 ))"
+    fi
+    echo "$p"
+}
+
+monitor_show_runtime_commands() {
+    local monitor_home="/home/monitor"
+    local start_cmd="cd $monitor_home && $monitor_home/venv/bin/python3 $monitor_home/monitor_panel.py >> $monitor_home/monitor.log 2>&1"
+    local tmux_bin
+    tmux_bin="$(command -v tmux || echo /usr/bin/tmux)"
+
+    monitor_show_action_ascii "commands"
+    echo "============================================================"
+    echo "                 MONITOR RUNTIME COMMANDS"
+    echo "============================================================"
+    echo "Start/Restart:"
+    echo "  sudo $tmux_bin kill-session -t monitor-panel"
+    echo "  sudo $tmux_bin new-session -d -s monitor-panel \"$start_cmd\""
+    echo
+    echo "Attach to running tmux session:"
+    echo "  sudo $tmux_bin attach -t monitor-panel"
+    echo
+    echo "Live logs (quit with q in menu option 5):"
+    echo "  sudo tail -n 80 -f $monitor_home/monitor.log"
+    echo "============================================================"
+}
+
 monitor_config_get() {
     local file="$1"
     local key="$2"
@@ -770,10 +1049,13 @@ monitor_write_python_script() {
 
     run_with_sudo tee "$monitor_script" >/dev/null <<'PYEOF'
 #!/usr/bin/env python3
+import logging
 import os
 import pwd
+import random
 import re
 import subprocess
+import sys
 import time
 from functools import wraps
 
@@ -787,11 +1069,12 @@ LAST_RULE_SYNC = 0.0
 
 
 def load_config():
+    random_port = str(random.randint(1024, 65535))
     cfg = {
         "PANEL_USER": "admin",
         "PANEL_PASS": "change-me",
         "PANEL_BIND": "0.0.0.0",
-        "PANEL_PORT": "20999",
+        "PANEL_PORT": random_port,
         "PANEL_PUBLIC_HOST": "127.0.0.1",
         "PANEL_SCHEME": "http",
     }
@@ -804,25 +1087,42 @@ def load_config():
                 k, v = line.split("=", 1)
                 cfg[k.strip()] = v.strip()
     try:
-        cfg["PANEL_PORT"] = str(int(cfg.get("PANEL_PORT", "20999")))
+        loaded_port = int(cfg.get("PANEL_PORT", random_port))
+        if loaded_port < 1024 or loaded_port > 65535:
+            raise ValueError("port_out_of_range")
+        cfg["PANEL_PORT"] = str(loaded_port)
     except ValueError:
-        cfg["PANEL_PORT"] = "20999"
+        cfg["PANEL_PORT"] = random_port
     return cfg
 
 
 CFG = load_config()
 app = Flask(__name__)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    stream=sys.stdout,
+)
+log = logging.getLogger("monitor")
 
-def run_cmd(args):
-    return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+def run_cmd(args, quiet=False):
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0 and not quiet:
+        err_text = (result.stderr or result.stdout or "").strip()
+        log.warning("Command failed: %s | rc=%s | out=%s", " ".join(args), result.returncode, err_text)
+    return result
 
 
 def list_target_users():
     result = subprocess.run(["bash", "-lc", USERS_CMD], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if result.returncode != 0:
+        log.warning("User list command failed: %s", (result.stderr or "").strip())
         return []
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    users = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    log.info("Detected %d eligible users", len(users))
+    return users
 
 
 def ensure_iptables_rules(users):
@@ -831,10 +1131,11 @@ def ensure_iptables_rules(users):
     if now - LAST_RULE_SYNC < 10:
         return
 
-    run_cmd(["iptables", "-w", "-N", CHAIN_NAME])
-    hook_check = run_cmd(["iptables", "-w", "-C", "OUTPUT", "-j", CHAIN_NAME])
+    run_cmd(["iptables", "-w", "-N", CHAIN_NAME], quiet=True)
+    hook_check = run_cmd(["iptables", "-w", "-C", "OUTPUT", "-j", CHAIN_NAME], quiet=True)
     if hook_check.returncode != 0:
         run_cmd(["iptables", "-w", "-I", "OUTPUT", "1", "-j", CHAIN_NAME])
+        log.info("Attached %s chain to OUTPUT", CHAIN_NAME)
 
     for user in users:
         try:
@@ -858,7 +1159,8 @@ def ensure_iptables_rules(users):
                 comment,
                 "-j",
                 "RETURN",
-            ]
+            ],
+            quiet=True,
         )
         if check.returncode != 0:
             run_cmd(
@@ -879,13 +1181,15 @@ def ensure_iptables_rules(users):
                     "RETURN",
                 ]
             )
+            log.info("Added counter rule for user=%s uid=%s", user, uid)
 
     LAST_RULE_SYNC = now
 
 
 def read_usage_counters():
-    result = run_cmd(["iptables", "-w", "-nvx", "-L", CHAIN_NAME])
+    result = run_cmd(["iptables", "-w", "-nvx", "-L", CHAIN_NAME], quiet=True)
     if result.returncode != 0:
+        log.warning("Unable to read iptables counters for chain=%s", CHAIN_NAME)
         return {}
 
     usage = {}
@@ -1101,22 +1405,38 @@ HTML = """<!doctype html>
 @app.get("/")
 @require_auth
 def home():
+    log.info("Serving panel home to %s", request.remote_addr)
     return render_template_string(HTML)
 
 
 @app.get("/api/data")
 @require_auth
 def api_data():
-    users = list_target_users()
-    ensure_iptables_rules(users)
-    usage = read_usage_counters()
-    payload = [{"username": user, "bytes": int(usage.get(user, 0))} for user in users]
-    return jsonify({"users": payload, "updated_at": int(time.time())})
+    try:
+        users = list_target_users()
+        ensure_iptables_rules(users)
+        usage = read_usage_counters()
+        payload = [{"username": user, "bytes": int(usage.get(user, 0))} for user in users]
+        return jsonify({"users": payload, "updated_at": int(time.time())})
+    except Exception as exc:
+        log.exception("api_data failed: %s", exc)
+        return jsonify({"users": [], "error": "internal_error", "updated_at": int(time.time())}), 500
+
+
+@app.get("/health")
+def health():
+    return jsonify({"ok": True, "ts": int(time.time())})
 
 
 def main():
     host = CFG.get("PANEL_BIND", "0.0.0.0")
-    port = int(CFG.get("PANEL_PORT", "20999"))
+    port = int(CFG.get("PANEL_PORT", str(random.randint(1024, 65535))))
+    public_host = CFG.get("PANEL_PUBLIC_HOST", "127.0.0.1")
+    scheme = CFG.get("PANEL_SCHEME", "http")
+    log.info("Starting monitor panel on %s:%s", host, port)
+    log.info("Panel login user=%s", CFG.get("PANEL_USER", "admin"))
+    log.info("Public link: %s://%s:%s", scheme, public_host, port)
+    log.info("Health URL: %s://%s:%s/health", scheme, public_host, port)
     app.run(host=host, port=port, debug=False, threaded=True)
 
 
@@ -1138,11 +1458,14 @@ monitor_ensure_reboot_autostart() {
     start_cmd="cd $monitor_home && $monitor_home/venv/bin/python3 $monitor_home/monitor_panel.py >> $monitor_home/monitor.log 2>&1"
     cron_line="@reboot $tmux_bin has-session -t monitor-panel 2>/dev/null || $tmux_bin new-session -d -s monitor-panel '$start_cmd'"
 
+    info "Running: crontab -l (check existing reboot entry)"
     current_cron="$(run_with_sudo crontab -l 2>/dev/null || true)"
     if grep -Fqx "$cron_line" <<<"$current_cron"; then
+        info "Reboot auto-start entry already exists."
         return 0
     fi
 
+    info "Running: add @reboot monitor-panel tmux command to root crontab"
     {
         [[ -n "$current_cron" ]] && printf '%s\n' "$current_cron"
         printf '%s\n' "$cron_line"
@@ -1154,9 +1477,12 @@ monitor_start_tmux() {
     local session_name="monitor-panel"
     local start_cmd="cd $monitor_home && $monitor_home/venv/bin/python3 $monitor_home/monitor_panel.py >> $monitor_home/monitor.log 2>&1"
 
+    info "Running: tmux has-session -t $session_name"
     if run_with_sudo tmux has-session -t "$session_name" 2>/dev/null; then
+        info "Running: tmux kill-session -t $session_name"
         run_with_sudo tmux kill-session -t "$session_name"
     fi
+    info "Running: tmux new-session -d -s $session_name \"$start_cmd\""
     run_with_sudo tmux new-session -d -s "$session_name" "$start_cmd"
 }
 
@@ -1164,6 +1490,7 @@ monitor_status() {
     local monitor_home="/home/monitor"
     local config_file="$monitor_home/config.env"
     local panel_user=""
+    local panel_pass=""
     local panel_port=""
     local public_host=""
     local public_scheme=""
@@ -1173,7 +1500,9 @@ monitor_status() {
         return 1
     fi
 
+    monitor_show_action_ascii "status"
     panel_user="$(monitor_config_get "$config_file" "PANEL_USER")"
+    panel_pass="$(monitor_config_get "$config_file" "PANEL_PASS")"
     panel_port="$(monitor_config_get "$config_file" "PANEL_PORT")"
     public_host="$(monitor_config_get "$config_file" "PANEL_PUBLIC_HOST")"
     public_scheme="$(monitor_config_get "$config_file" "PANEL_SCHEME")"
@@ -1183,7 +1512,8 @@ monitor_status() {
     echo "                    MONITOR DETAILS"
     echo "============================================================"
     echo "  Panel User  : ${panel_user:-admin}"
-    echo "  Panel Link  : ${public_scheme:-http}://${public_host:-127.0.0.1}:${panel_port:-20999}"
+    echo "  Panel Pass  : ${panel_pass:-change-me}"
+    echo "  Panel Link  : ${public_scheme:-http}://${public_host:-127.0.0.1}:${panel_port:-unknown}"
     echo "  Open Link   : copy/paste link above in browser"
     if run_with_sudo tmux has-session -t monitor-panel 2>/dev/null; then
         echo "  TMUX       : running (session: monitor-panel)"
@@ -1193,6 +1523,7 @@ monitor_status() {
     echo "  Log File   : $monitor_home/monitor.log"
     echo "============================================================"
     echo
+    monitor_show_runtime_commands
 }
 
 monitor_install() {
@@ -1212,21 +1543,29 @@ monitor_install() {
     local panel_port=""
     local public_host=""
     local public_scheme=""
+    local random_port=""
 
     show_monitor_banner
+    monitor_show_action_ascii "install"
     info "Installing monitor requirements (python3, venv, tmux, iptables)..."
+    info "Running: apt-get update -y"
     run_with_sudo apt-get update -y
+    info "Running: apt-get install -y python3 python3-venv python3-pip tmux iptables curl"
     run_with_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip tmux iptables curl
 
+    info "Running: mkdir -p $monitor_home"
     run_with_sudo mkdir -p "$monitor_home"
 
     if [[ ! -d "$venv_dir" ]]; then
         info "Creating Python virtual environment..."
+        info "Running: python3 -m venv $venv_dir"
         run_with_sudo python3 -m venv "$venv_dir"
     fi
 
     info "Installing Python dependencies in venv..."
+    info "Running: $venv_dir/bin/pip install --upgrade pip"
     run_with_sudo "$venv_dir/bin/pip" install --upgrade pip >/dev/null
+    info "Running: $venv_dir/bin/pip install flask"
     run_with_sudo "$venv_dir/bin/pip" install flask >/dev/null
 
     monitor_write_python_script "$monitor_script"
@@ -1240,13 +1579,14 @@ monitor_install() {
         current_scheme="$(monitor_config_get "$config_file" "PANEL_SCHEME")"
     fi
 
+    random_port="$(monitor_random_port)"
     panel_user="$(prompt_with_default "Monitor panel username" "${current_user:-admin}")"
     while [[ -z "$panel_user" ]]; do
         warn "Username cannot be empty."
         panel_user="$(prompt_with_default "Monitor panel username" "admin")"
     done
 
-    read -r -s -p "$(printf '\033[1;36m%s\033[0m: ' "Monitor panel password (Enter=keep current)")" panel_pass
+    read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Monitor panel password (visible, Enter=keep current)")" panel_pass
     echo
     if [[ -z "$panel_pass" ]]; then
         panel_pass="${current_pass:-change-me}"
@@ -1255,7 +1595,7 @@ monitor_install() {
     panel_bind="$(prompt_with_default "Bind host" "${current_bind:-0.0.0.0}")"
 
     while true; do
-        panel_port="$(prompt_with_default "Panel port" "${current_port:-20999}")"
+        panel_port="$(prompt_with_default "Panel port (random default for safety)" "${current_port:-$random_port}")"
         if is_valid_port "$panel_port"; then
             break
         fi
@@ -1284,6 +1624,9 @@ monitor_install() {
 
     success "Monitor installed and running inside tmux session 'monitor-panel'."
     monitor_status
+    if prompt_yes_no "Open live monitor logs now? (press q to quit)" "y"; then
+        monitor_show_logs
+    fi
 }
 
 monitor_edit() {
@@ -1301,18 +1644,21 @@ monitor_edit() {
     local panel_port=""
     local public_host=""
     local public_scheme=""
+    local random_port=""
 
     if [[ ! -f "$config_file" ]]; then
         warn "Monitor config not found. Run: $0 monitor and choose option 1."
         return 1
     fi
 
+    monitor_show_action_ascii "edit"
     current_user="$(monitor_config_get "$config_file" "PANEL_USER")"
     current_pass="$(monitor_config_get "$config_file" "PANEL_PASS")"
     current_bind="$(monitor_config_get "$config_file" "PANEL_BIND")"
     current_port="$(monitor_config_get "$config_file" "PANEL_PORT")"
     current_public_host="$(monitor_config_get "$config_file" "PANEL_PUBLIC_HOST")"
     current_scheme="$(monitor_config_get "$config_file" "PANEL_SCHEME")"
+    random_port="$(monitor_random_port)"
 
     panel_user="$(prompt_with_default "Monitor panel username" "${current_user:-admin}")"
     while [[ -z "$panel_user" ]]; do
@@ -1320,7 +1666,7 @@ monitor_edit() {
         panel_user="$(prompt_with_default "Monitor panel username" "admin")"
     done
 
-    read -r -s -p "$(printf '\033[1;36m%s\033[0m: ' "Monitor panel password (Enter=keep current)")" panel_pass
+    read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Monitor panel password (visible, Enter=keep current)")" panel_pass
     echo
     if [[ -z "$panel_pass" ]]; then
         panel_pass="${current_pass:-change-me}"
@@ -1329,7 +1675,7 @@ monitor_edit() {
     panel_bind="$(prompt_with_default "Bind host" "${current_bind:-0.0.0.0}")"
 
     while true; do
-        panel_port="$(prompt_with_default "Panel port" "${current_port:-20999}")"
+        panel_port="$(prompt_with_default "Panel port (random default for safety)" "${current_port:-$random_port}")"
         if is_valid_port "$panel_port"; then
             break
         fi
@@ -1362,34 +1708,59 @@ monitor_restart() {
         return 1
     fi
 
+    monitor_show_action_ascii "restart"
+    info "Restarting monitor panel..."
     monitor_start_tmux "$monitor_home"
     success "Monitor panel restarted in tmux session 'monitor-panel'."
     monitor_status
+    if prompt_yes_no "Open live monitor logs now? (press q to quit)" "y"; then
+        monitor_show_logs
+    fi
 }
 
 monitor_show_logs() {
     local log_file="/home/monitor/monitor.log"
+    local key=""
+    local tail_pid=""
+
+    monitor_show_action_ascii "logs"
     if [[ ! -f "$log_file" ]]; then
         warn "Log file not found yet: $log_file"
         return 1
     fi
-    info "Last 40 lines from monitor log:"
-    run_with_sudo tail -n 40 "$log_file"
+    info "Live log view started. Press q to quit."
+    run_with_sudo tail -n 80 -f "$log_file" &
+    tail_pid=$!
+
+    while true; do
+        IFS= read -r -s -n1 key
+        if [[ "$key" == "q" || "$key" == "Q" ]]; then
+            break
+        fi
+    done
+
+    run_with_sudo kill "$tail_pid" 2>/dev/null || kill "$tail_pid" 2>/dev/null || true
+    wait "$tail_pid" 2>/dev/null || true
+    echo
+    info "Exited live log view."
+    MONITOR_SKIP_PAUSE=1
 }
 
 monitor_menu() {
     local choice=""
     clear || true
     show_monitor_banner
+    monitor_show_action_ascii "menu"
     echo "====================== MONITOR MENU ========================"
     echo "  [1] Install or update monitoring system"
     echo "  [2] Edit panel username/password/settings"
     echo "  [3] Restart monitor panel"
     echo "  [4] Show panel details + direct link"
-    echo "  [5] Show monitor logs (last 40 lines)"
-    echo "  [6] Exit"
+    echo "  [5] Live monitor logs (press q to quit)"
+    echo "  [6] Show runtime commands"
+    echo "  [7] Exit"
     echo "============================================================"
-    read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Select option [1-6]")" choice
+    read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Select option [1-7]")" choice
 
     case "$choice" in
         1) monitor_install; return 1 ;;
@@ -1397,15 +1768,21 @@ monitor_menu() {
         3) monitor_restart; return 1 ;;
         4) monitor_status; return 1 ;;
         5) monitor_show_logs; return 1 ;;
-        6) return 0 ;;
+        6) monitor_show_runtime_commands; return 1 ;;
+        7) return 0 ;;
         *) warn "Invalid option: $choice"; return 1 ;;
     esac
 }
 
 run_monitor() {
+    MONITOR_SKIP_PAUSE=0
     while true; do
         if monitor_menu; then
             break
+        fi
+        if [[ "${MONITOR_SKIP_PAUSE:-0}" == "1" ]]; then
+            MONITOR_SKIP_PAUSE=0
+            continue
         fi
         echo
         read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Press Enter to return to menu")" _
@@ -1416,6 +1793,7 @@ run_monitor() {
 # STEP ALL: RUN EVERYTHING IN ORDER
 # ------------------------------------------------------------
 run_all() {
+    show_core_action_ascii "all"
     info "STEP 1/5: users"
     add_users
     sleep "$STEP_DELAY"
@@ -1450,7 +1828,7 @@ Usage: $0 {users|ssh|recaptcha|udgpw|bbr|sshtunnel|monitor|all} [port] [users_li
   udgpw      - Set UDPGW port to $UDPGW_PORT (silent, auto‑correct)
   bbr        - Enable BBR (install_kernel.sh second pass)
   sshtunnel  - Interactive SSH DNAT tunnel + optional reboot persistence
-  monitor    - Interactive monitor menu (install/edit/restart/status/logs)
+  monitor    - Interactive monitor menu (install/edit/restart/status/logs/commands)
   all        - Execute all steps in the correct order (requires users list)
 
 Example:
