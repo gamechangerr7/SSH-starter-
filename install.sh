@@ -695,6 +695,724 @@ run_sshtunnel() {
 }
 
 # ------------------------------------------------------------
+# STEP M: USER TRAFFIC MONITOR PANEL (INTERACTIVE + TMUX)
+# ------------------------------------------------------------
+show_monitor_banner() {
+    echo -e "\033[1;35m"
+    cat <<'EOF'
+
+ ██████   ██████    ███████    ██████   █████ █████ ███████████    ███████    ███████████  
+▒▒██████ ██████   ███▒▒▒▒▒███ ▒▒██████ ▒▒███ ▒▒███ ▒█▒▒▒███▒▒▒█  ███▒▒▒▒▒███ ▒▒███▒▒▒▒▒███ 
+ ▒███▒█████▒███  ███     ▒▒███ ▒███▒███ ▒███  ▒███ ▒   ▒███  ▒  ███     ▒▒███ ▒███    ▒███ 
+ ▒███▒▒███ ▒███ ▒███      ▒███ ▒███▒▒███▒███  ▒███     ▒███    ▒███      ▒███ ▒██████████  
+ ▒███ ▒▒▒  ▒███ ▒███      ▒███ ▒███ ▒▒██████  ▒███     ▒███    ▒███      ▒███ ▒███▒▒▒▒▒███ 
+ ▒███      ▒███ ▒▒███     ███  ▒███  ▒▒█████  ▒███     ▒███    ▒▒███     ███  ▒███    ▒███ 
+ █████     █████ ▒▒▒███████▒   █████  ▒▒█████ █████    █████    ▒▒▒███████▒   █████   █████
+▒▒▒▒▒     ▒▒▒▒▒    ▒▒▒▒▒▒▒    ▒▒▒▒▒    ▒▒▒▒▒ ▒▒▒▒▒    ▒▒▒▒▒       ▒▒▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ 
+                                                                                           
+EOF
+    echo -e "\033[0m"
+}
+
+monitor_config_get() {
+    local file="$1"
+    local key="$2"
+    run_with_sudo awk -F= -v k="$key" '$1==k {print substr($0, length(k)+2); exit}' "$file" 2>/dev/null || true
+}
+
+monitor_detect_public_host() {
+    local fallback=""
+    detect_public_ipv4 || true
+    if [[ -n "${DETECTED_IRAN_IP:-}" ]]; then
+        echo "$DETECTED_IRAN_IP"
+        return 0
+    fi
+    fallback="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+    echo "${fallback:-127.0.0.1}"
+}
+
+monitor_write_config_file() {
+    local config_file="$1"
+    local panel_user="$2"
+    local panel_pass="$3"
+    local panel_bind="$4"
+    local panel_port="$5"
+    local public_host="$6"
+    local public_scheme="$7"
+
+    panel_user="${panel_user//$'\n'/}"
+    panel_user="${panel_user//$'\r'/}"
+    panel_pass="${panel_pass//$'\n'/}"
+    panel_pass="${panel_pass//$'\r'/}"
+    panel_bind="${panel_bind//$'\n'/}"
+    panel_bind="${panel_bind//$'\r'/}"
+    panel_port="${panel_port//$'\n'/}"
+    panel_port="${panel_port//$'\r'/}"
+    public_host="${public_host//$'\n'/}"
+    public_host="${public_host//$'\r'/}"
+    public_scheme="${public_scheme//$'\n'/}"
+    public_scheme="${public_scheme//$'\r'/}"
+
+    run_with_sudo tee "$config_file" >/dev/null <<EOF
+PANEL_USER=$panel_user
+PANEL_PASS=$panel_pass
+PANEL_BIND=$panel_bind
+PANEL_PORT=$panel_port
+PANEL_PUBLIC_HOST=$public_host
+PANEL_SCHEME=$public_scheme
+EOF
+
+    run_with_sudo chmod 600 "$config_file"
+}
+
+monitor_write_python_script() {
+    local monitor_script="$1"
+
+    run_with_sudo tee "$monitor_script" >/dev/null <<'PYEOF'
+#!/usr/bin/env python3
+import os
+import pwd
+import re
+import subprocess
+import time
+from functools import wraps
+
+from flask import Flask, Response, jsonify, render_template_string, request
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(BASE_DIR, "config.env")
+USERS_CMD = r"""awk -F: '$3>=1000 && $7 !~ /(nologin|false)$/ && $1!="ubuntu" {print $1":"$3}' /etc/passwd | sort -t: -k2,2nr | cut -d: -f1"""
+CHAIN_NAME = "MONITOR_USAGE"
+LAST_RULE_SYNC = 0.0
+
+
+def load_config():
+    cfg = {
+        "PANEL_USER": "admin",
+        "PANEL_PASS": "change-me",
+        "PANEL_BIND": "0.0.0.0",
+        "PANEL_PORT": "20999",
+        "PANEL_PUBLIC_HOST": "127.0.0.1",
+        "PANEL_SCHEME": "http",
+    }
+    if os.path.isfile(CONFIG_PATH):
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                cfg[k.strip()] = v.strip()
+    try:
+        cfg["PANEL_PORT"] = str(int(cfg.get("PANEL_PORT", "20999")))
+    except ValueError:
+        cfg["PANEL_PORT"] = "20999"
+    return cfg
+
+
+CFG = load_config()
+app = Flask(__name__)
+
+
+def run_cmd(args):
+    return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+
+def list_target_users():
+    result = subprocess.run(["bash", "-lc", USERS_CMD], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def ensure_iptables_rules(users):
+    global LAST_RULE_SYNC
+    now = time.time()
+    if now - LAST_RULE_SYNC < 10:
+        return
+
+    run_cmd(["iptables", "-w", "-N", CHAIN_NAME])
+    hook_check = run_cmd(["iptables", "-w", "-C", "OUTPUT", "-j", CHAIN_NAME])
+    if hook_check.returncode != 0:
+        run_cmd(["iptables", "-w", "-I", "OUTPUT", "1", "-j", CHAIN_NAME])
+
+    for user in users:
+        try:
+            uid = pwd.getpwnam(user).pw_uid
+        except KeyError:
+            continue
+        comment = f"MONITOR:{user}"
+        check = run_cmd(
+            [
+                "iptables",
+                "-w",
+                "-C",
+                CHAIN_NAME,
+                "-m",
+                "owner",
+                "--uid-owner",
+                str(uid),
+                "-m",
+                "comment",
+                "--comment",
+                comment,
+                "-j",
+                "RETURN",
+            ]
+        )
+        if check.returncode != 0:
+            run_cmd(
+                [
+                    "iptables",
+                    "-w",
+                    "-A",
+                    CHAIN_NAME,
+                    "-m",
+                    "owner",
+                    "--uid-owner",
+                    str(uid),
+                    "-m",
+                    "comment",
+                    "--comment",
+                    comment,
+                    "-j",
+                    "RETURN",
+                ]
+            )
+
+    LAST_RULE_SYNC = now
+
+
+def read_usage_counters():
+    result = run_cmd(["iptables", "-w", "-nvx", "-L", CHAIN_NAME])
+    if result.returncode != 0:
+        return {}
+
+    usage = {}
+    pattern = re.compile(r"^\s*\d+\s+(\d+).*/\*\s*MONITOR:([A-Za-z0-9._-]+)\s*\*/")
+    for line in result.stdout.splitlines():
+        match = pattern.search(line)
+        if not match:
+            continue
+        bytes_used = int(match.group(1))
+        user = match.group(2)
+        usage[user] = bytes_used
+    return usage
+
+
+def auth_ok():
+    auth = request.authorization
+    return bool(auth and auth.username == CFG["PANEL_USER"] and auth.password == CFG["PANEL_PASS"])
+
+
+def require_auth(handler):
+    @wraps(handler)
+    def wrapped(*args, **kwargs):
+        if not auth_ok():
+            return Response("Authentication required", 401, {"WWW-Authenticate": 'Basic realm="Monitor Panel"'})
+        return handler(*args, **kwargs)
+
+    return wrapped
+
+
+HTML = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitor Panel</title>
+  <style>
+    :root {
+      --bg-a: #081a1f;
+      --bg-b: #12343b;
+      --card: rgba(255,255,255,0.08);
+      --line: rgba(255,255,255,0.16);
+      --text: #e6f4f1;
+      --muted: #96b7b1;
+      --accent: #26d4a0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background: radial-gradient(1000px 600px at 15% 0%, #1f555f 0%, var(--bg-a) 45%, var(--bg-b) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .wrap {
+      width: min(980px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      overflow: hidden;
+    }
+    .top {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-size: 22px;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .pulse {
+      color: var(--accent);
+      font-weight: 600;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink {
+      0%,100% { opacity: 1; }
+      50% { opacity: .35; }
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      color: #bde8df;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      background: rgba(0,0,0,0.15);
+    }
+    td {
+      font-size: 14px;
+    }
+    tr:last-child td { border-bottom: none; }
+    .user { font-weight: 700; }
+    .muted { color: var(--muted); }
+    .empty {
+      padding: 28px 20px;
+      color: var(--muted);
+    }
+    .foot {
+      padding: 12px 14px 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">Live User Data Usage Panel</div>
+        <div class="meta">Refresh: 5x per second | Source: iptables owner UID counters</div>
+      </div>
+      <div class="meta">Status: <span class="pulse">LIVE</span></div>
+    </div>
+    <div id="tableWrap">
+      <div class="empty">Loading...</div>
+    </div>
+    <div class="foot">Units auto-switch between KB / MB / GB.</div>
+  </div>
+
+  <script>
+    const prev = new Map();
+    let prevTs = performance.now();
+
+    function unit(bytes) {
+      if (bytes < 1024) return bytes.toFixed(0) + " B";
+      if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(2) + " KB";
+      if (bytes < 1024 ** 3) return (bytes / (1024 ** 2)).toFixed(2) + " MB";
+      return (bytes / (1024 ** 3)).toFixed(2) + " GB";
+    }
+
+    function render(users) {
+      if (!users.length) {
+        document.getElementById("tableWrap").innerHTML =
+          '<div class="empty">No eligible users found.</div>';
+        return;
+      }
+      const now = performance.now();
+      const dt = Math.max((now - prevTs) / 1000, 0.001);
+      prevTs = now;
+
+      const rows = users.map((u, idx) => {
+        const old = prev.has(u.username) ? prev.get(u.username) : u.bytes;
+        const delta = Math.max(u.bytes - old, 0);
+        const rate = delta / dt;
+        prev.set(u.username, u.bytes);
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td class="user">${u.username}</td>
+            <td>${unit(u.bytes)}</td>
+            <td>${unit(rate)}/s</td>
+          </tr>
+        `;
+      }).join("");
+
+      document.getElementById("tableWrap").innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>User</th>
+              <th>Total Used</th>
+              <th>Live Speed</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    async function tick() {
+      try {
+        const res = await fetch("/api/data", { cache: "no-store" });
+        if (!res.ok) throw new Error("bad response");
+        const data = await res.json();
+        render(data.users || []);
+      } catch (err) {
+        document.getElementById("tableWrap").innerHTML =
+          '<div class="empty">Panel error: cannot read live data. Check monitor log.</div>';
+      }
+    }
+
+    tick();
+    setInterval(tick, 200);
+  </script>
+</body>
+</html>
+"""
+
+
+@app.get("/")
+@require_auth
+def home():
+    return render_template_string(HTML)
+
+
+@app.get("/api/data")
+@require_auth
+def api_data():
+    users = list_target_users()
+    ensure_iptables_rules(users)
+    usage = read_usage_counters()
+    payload = [{"username": user, "bytes": int(usage.get(user, 0))} for user in users]
+    return jsonify({"users": payload, "updated_at": int(time.time())})
+
+
+def main():
+    host = CFG.get("PANEL_BIND", "0.0.0.0")
+    port = int(CFG.get("PANEL_PORT", "20999"))
+    app.run(host=host, port=port, debug=False, threaded=True)
+
+
+if __name__ == "__main__":
+    main()
+PYEOF
+
+    run_with_sudo chmod 755 "$monitor_script"
+}
+
+monitor_ensure_reboot_autostart() {
+    local monitor_home="$1"
+    local tmux_bin=""
+    local start_cmd=""
+    local cron_line=""
+    local current_cron=""
+
+    tmux_bin="$(command -v tmux || echo /usr/bin/tmux)"
+    start_cmd="cd $monitor_home && $monitor_home/venv/bin/python3 $monitor_home/monitor_panel.py >> $monitor_home/monitor.log 2>&1"
+    cron_line="@reboot $tmux_bin has-session -t monitor-panel 2>/dev/null || $tmux_bin new-session -d -s monitor-panel '$start_cmd'"
+
+    current_cron="$(run_with_sudo crontab -l 2>/dev/null || true)"
+    if grep -Fqx "$cron_line" <<<"$current_cron"; then
+        return 0
+    fi
+
+    {
+        [[ -n "$current_cron" ]] && printf '%s\n' "$current_cron"
+        printf '%s\n' "$cron_line"
+    } | run_with_sudo crontab -
+}
+
+monitor_start_tmux() {
+    local monitor_home="$1"
+    local session_name="monitor-panel"
+    local start_cmd="cd $monitor_home && $monitor_home/venv/bin/python3 $monitor_home/monitor_panel.py >> $monitor_home/monitor.log 2>&1"
+
+    if run_with_sudo tmux has-session -t "$session_name" 2>/dev/null; then
+        run_with_sudo tmux kill-session -t "$session_name"
+    fi
+    run_with_sudo tmux new-session -d -s "$session_name" "$start_cmd"
+}
+
+monitor_status() {
+    local monitor_home="/home/monitor"
+    local config_file="$monitor_home/config.env"
+    local panel_user=""
+    local panel_port=""
+    local public_host=""
+    local public_scheme=""
+
+    if [[ ! -f "$config_file" ]]; then
+        warn "Monitor is not installed yet. Run: $0 monitor and choose option 1."
+        return 1
+    fi
+
+    panel_user="$(monitor_config_get "$config_file" "PANEL_USER")"
+    panel_port="$(monitor_config_get "$config_file" "PANEL_PORT")"
+    public_host="$(monitor_config_get "$config_file" "PANEL_PUBLIC_HOST")"
+    public_scheme="$(monitor_config_get "$config_file" "PANEL_SCHEME")"
+
+    echo
+    echo "============================================================"
+    echo "                    MONITOR DETAILS"
+    echo "============================================================"
+    echo "  Panel User  : ${panel_user:-admin}"
+    echo "  Panel Link  : ${public_scheme:-http}://${public_host:-127.0.0.1}:${panel_port:-20999}"
+    echo "  Open Link   : copy/paste link above in browser"
+    if run_with_sudo tmux has-session -t monitor-panel 2>/dev/null; then
+        echo "  TMUX       : running (session: monitor-panel)"
+    else
+        echo "  TMUX       : stopped"
+    fi
+    echo "  Log File   : $monitor_home/monitor.log"
+    echo "============================================================"
+    echo
+}
+
+monitor_install() {
+    local monitor_home="/home/monitor"
+    local venv_dir="$monitor_home/venv"
+    local monitor_script="$monitor_home/monitor_panel.py"
+    local config_file="$monitor_home/config.env"
+    local current_user=""
+    local current_pass=""
+    local current_bind=""
+    local current_port=""
+    local current_public_host=""
+    local current_scheme=""
+    local panel_user=""
+    local panel_pass=""
+    local panel_bind=""
+    local panel_port=""
+    local public_host=""
+    local public_scheme=""
+
+    show_monitor_banner
+    info "Installing monitor requirements (python3, venv, tmux, iptables)..."
+    run_with_sudo apt-get update -y
+    run_with_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip tmux iptables curl
+
+    run_with_sudo mkdir -p "$monitor_home"
+
+    if [[ ! -d "$venv_dir" ]]; then
+        info "Creating Python virtual environment..."
+        run_with_sudo python3 -m venv "$venv_dir"
+    fi
+
+    info "Installing Python dependencies in venv..."
+    run_with_sudo "$venv_dir/bin/pip" install --upgrade pip >/dev/null
+    run_with_sudo "$venv_dir/bin/pip" install flask >/dev/null
+
+    monitor_write_python_script "$monitor_script"
+
+    if [[ -f "$config_file" ]]; then
+        current_user="$(monitor_config_get "$config_file" "PANEL_USER")"
+        current_pass="$(monitor_config_get "$config_file" "PANEL_PASS")"
+        current_bind="$(monitor_config_get "$config_file" "PANEL_BIND")"
+        current_port="$(monitor_config_get "$config_file" "PANEL_PORT")"
+        current_public_host="$(monitor_config_get "$config_file" "PANEL_PUBLIC_HOST")"
+        current_scheme="$(monitor_config_get "$config_file" "PANEL_SCHEME")"
+    fi
+
+    panel_user="$(prompt_with_default "Monitor panel username" "${current_user:-admin}")"
+    while [[ -z "$panel_user" ]]; do
+        warn "Username cannot be empty."
+        panel_user="$(prompt_with_default "Monitor panel username" "admin")"
+    done
+
+    read -r -s -p "$(printf '\033[1;36m%s\033[0m: ' "Monitor panel password (Enter=keep current)")" panel_pass
+    echo
+    if [[ -z "$panel_pass" ]]; then
+        panel_pass="${current_pass:-change-me}"
+    fi
+
+    panel_bind="$(prompt_with_default "Bind host" "${current_bind:-0.0.0.0}")"
+
+    while true; do
+        panel_port="$(prompt_with_default "Panel port" "${current_port:-20999}")"
+        if is_valid_port "$panel_port"; then
+            break
+        fi
+        warn "Invalid port. Enter a number between 1 and 65535."
+    done
+
+    public_host="$(prompt_with_default "Public domain/IP for link" "${current_public_host:-$(monitor_detect_public_host)}")"
+    while [[ -z "$public_host" ]]; do
+        warn "Public domain/IP cannot be empty."
+        public_host="$(prompt_with_default "Public domain/IP for link" "$(monitor_detect_public_host)")"
+    done
+
+    public_scheme="$(prompt_with_default "Public scheme (http or https)" "${current_scheme:-http}")"
+    if [[ "$public_scheme" != "http" && "$public_scheme" != "https" ]]; then
+        public_scheme="http"
+    fi
+
+    monitor_write_config_file "$config_file" "$panel_user" "$panel_pass" "$panel_bind" "$panel_port" "$public_host" "$public_scheme"
+    monitor_start_tmux "$monitor_home"
+
+    if command -v crontab &>/dev/null; then
+        monitor_ensure_reboot_autostart "$monitor_home"
+    else
+        warn "crontab command not found. Auto-start on reboot was skipped."
+    fi
+
+    success "Monitor installed and running inside tmux session 'monitor-panel'."
+    monitor_status
+}
+
+monitor_edit() {
+    local monitor_home="/home/monitor"
+    local config_file="$monitor_home/config.env"
+    local current_user=""
+    local current_pass=""
+    local current_bind=""
+    local current_port=""
+    local current_public_host=""
+    local current_scheme=""
+    local panel_user=""
+    local panel_pass=""
+    local panel_bind=""
+    local panel_port=""
+    local public_host=""
+    local public_scheme=""
+
+    if [[ ! -f "$config_file" ]]; then
+        warn "Monitor config not found. Run: $0 monitor and choose option 1."
+        return 1
+    fi
+
+    current_user="$(monitor_config_get "$config_file" "PANEL_USER")"
+    current_pass="$(monitor_config_get "$config_file" "PANEL_PASS")"
+    current_bind="$(monitor_config_get "$config_file" "PANEL_BIND")"
+    current_port="$(monitor_config_get "$config_file" "PANEL_PORT")"
+    current_public_host="$(monitor_config_get "$config_file" "PANEL_PUBLIC_HOST")"
+    current_scheme="$(monitor_config_get "$config_file" "PANEL_SCHEME")"
+
+    panel_user="$(prompt_with_default "Monitor panel username" "${current_user:-admin}")"
+    while [[ -z "$panel_user" ]]; do
+        warn "Username cannot be empty."
+        panel_user="$(prompt_with_default "Monitor panel username" "admin")"
+    done
+
+    read -r -s -p "$(printf '\033[1;36m%s\033[0m: ' "Monitor panel password (Enter=keep current)")" panel_pass
+    echo
+    if [[ -z "$panel_pass" ]]; then
+        panel_pass="${current_pass:-change-me}"
+    fi
+
+    panel_bind="$(prompt_with_default "Bind host" "${current_bind:-0.0.0.0}")"
+
+    while true; do
+        panel_port="$(prompt_with_default "Panel port" "${current_port:-20999}")"
+        if is_valid_port "$panel_port"; then
+            break
+        fi
+        warn "Invalid port. Enter a number between 1 and 65535."
+    done
+
+    public_host="$(prompt_with_default "Public domain/IP for link" "${current_public_host:-$(monitor_detect_public_host)}")"
+    while [[ -z "$public_host" ]]; do
+        warn "Public domain/IP cannot be empty."
+        public_host="$(prompt_with_default "Public domain/IP for link" "$(monitor_detect_public_host)")"
+    done
+
+    public_scheme="$(prompt_with_default "Public scheme (http or https)" "${current_scheme:-http}")"
+    if [[ "$public_scheme" != "http" && "$public_scheme" != "https" ]]; then
+        public_scheme="http"
+    fi
+
+    monitor_write_config_file "$config_file" "$panel_user" "$panel_pass" "$panel_bind" "$panel_port" "$public_host" "$public_scheme"
+    success "Monitor settings updated."
+    monitor_restart
+}
+
+monitor_restart() {
+    local monitor_home="/home/monitor"
+    local monitor_script="$monitor_home/monitor_panel.py"
+    local venv_python="$monitor_home/venv/bin/python3"
+
+    if [[ ! -f "$monitor_script" || ! -x "$venv_python" ]]; then
+        warn "Monitor is not fully installed. Run: $0 monitor and choose option 1."
+        return 1
+    fi
+
+    monitor_start_tmux "$monitor_home"
+    success "Monitor panel restarted in tmux session 'monitor-panel'."
+    monitor_status
+}
+
+monitor_show_logs() {
+    local log_file="/home/monitor/monitor.log"
+    if [[ ! -f "$log_file" ]]; then
+        warn "Log file not found yet: $log_file"
+        return 1
+    fi
+    info "Last 40 lines from monitor log:"
+    run_with_sudo tail -n 40 "$log_file"
+}
+
+monitor_menu() {
+    local choice=""
+    clear || true
+    show_monitor_banner
+    echo "====================== MONITOR MENU ========================"
+    echo "  [1] Install or update monitoring system"
+    echo "  [2] Edit panel username/password/settings"
+    echo "  [3] Restart monitor panel"
+    echo "  [4] Show panel details + direct link"
+    echo "  [5] Show monitor logs (last 40 lines)"
+    echo "  [6] Exit"
+    echo "============================================================"
+    read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Select option [1-6]")" choice
+
+    case "$choice" in
+        1) monitor_install; return 1 ;;
+        2) monitor_edit; return 1 ;;
+        3) monitor_restart; return 1 ;;
+        4) monitor_status; return 1 ;;
+        5) monitor_show_logs; return 1 ;;
+        6) return 0 ;;
+        *) warn "Invalid option: $choice"; return 1 ;;
+    esac
+}
+
+run_monitor() {
+    while true; do
+        if monitor_menu; then
+            break
+        fi
+        echo
+        read -r -p "$(printf '\033[1;36m%s\033[0m: ' "Press Enter to return to menu")" _
+    done
+}
+
+# ------------------------------------------------------------
 # STEP ALL: RUN EVERYTHING IN ORDER
 # ------------------------------------------------------------
 run_all() {
@@ -724,7 +1442,7 @@ run_all() {
 # ------------------------------------------------------------
 usage() {
     cat <<EOF
-Usage: $0 {users|ssh|recaptcha|udgpw|bbr|sshtunnel|all} [port] [users_list]
+Usage: $0 {users|ssh|recaptcha|udgpw|bbr|sshtunnel|monitor|all} [port] [users_list]
 
   users      - Create users from list (comma-separated)
   ssh        - Change SSH port (default $SSH_PORT) and set ciphers
@@ -732,12 +1450,14 @@ Usage: $0 {users|ssh|recaptcha|udgpw|bbr|sshtunnel|all} [port] [users_list]
   udgpw      - Set UDPGW port to $UDPGW_PORT (silent, auto‑correct)
   bbr        - Enable BBR (install_kernel.sh second pass)
   sshtunnel  - Interactive SSH DNAT tunnel + optional reboot persistence
+  monitor    - Interactive monitor menu (install/edit/restart/status/logs)
   all        - Execute all steps in the correct order (requires users list)
 
 Example:
   $0 users shayan,anothername
   $0 ssh 2233
   $0 sshtunnel
+  $0 monitor
   $0 all 2233 shayan,anothername
   $0 all shayan,anothername
 EOF
@@ -755,6 +1475,7 @@ case "$1" in
     udgpw)      run_udgpw ;;
     bbr)        run_bbr ;;
     sshtunnel)  run_sshtunnel ;;
+    monitor)    run_monitor ;;
     all)
         if [[ "${2-}" =~ ^[0-9]+$ ]]; then
             parse_port_arg "${2-}"
