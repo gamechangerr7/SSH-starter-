@@ -1734,6 +1734,7 @@ monitor_show_logs() {
 monitor_menu() {
     local choice=""
     clear || true
+    show_monitor_banner
     echo "  [1] Install or update monitoring system"
     echo "  [2] Edit panel username/password/settings"
     echo "  [3] Restart monitor panel"
